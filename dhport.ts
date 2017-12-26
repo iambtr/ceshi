@@ -122,10 +122,21 @@ class DhPort {
             }
         })
     }
-    write(bf) {
+    write(op) {
         return new Promise((resolve,reject)=>{
+            this.pEvent.on('data_proc',data=>{
+                console.log('未解析'+data.toString('hex'))
+                op.analyse.call(op.canParseObj, data, endData => {
+                    resolve(endData)
+                }, err => {
+                    reject(err)
+                })
+            })
+            setTimeout(()=>{
+                reject('超时请重新发送')
+            },op.time*1000)
             if (this.port != '') {
-                this.port.write(bf, err=>{
+                this.port.write(op.data, err=>{
                     if (err) {
                         reject('Error on write:'+err.message)
                     }else {
@@ -136,17 +147,6 @@ class DhPort {
                 reject('串口未连接或者不存在')
             }
 
-        })
-    }
-    //传入帧解析方法
-    readByCanAnalyse(obj,analyse,resolve,reject){
-        return this.pEvent.on('data_proc',data=>{
-            console.log('未解析'+data.toString('hex'))
-            analyse.call(obj, data, endData => {
-                resolve(endData)
-            }, err => {
-                reject(err)
-            })
         })
     }
 }

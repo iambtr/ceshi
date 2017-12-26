@@ -217,7 +217,7 @@ function startCheck() {
         format:1,
         remoteType:1
     })
-    portTbox.write(writeCan)
+    portTbox.write(writeCan,2)
         .then(function (msg) {
             console.log(msg);
         }).catch(function (err) {
@@ -396,5 +396,8 @@ function writeCans(str,callBack) {
             callBack&&callBack(writeCan)
         }
     }
+}
+function portWrite(){
+
 }
 
