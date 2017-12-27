@@ -124,29 +124,39 @@ class DhPort {
     }
     write(op) {
         return new Promise((resolve,reject)=>{
-            this.pEvent.on('data_proc',data=>{
-                console.log('未解析'+data.toString('hex'))
-                op.analyse.call(op.canParseObj, data, endData => {
-                    resolve(endData)
-                }, err => {
-                    reject(err)
+            if(op.canParseObj){
+                this.pEvent.on('data_proc',data=>{
+                    console.log('未解析'+data.toString('hex'))
+                    op.analyse.call(op.canParseObj, data, endData => {
+                        resolve(endData)
+                    }, err => {
+                        reject(err)
+                    })
                 })
-            })
-            setTimeout(()=>{
-                reject('超时请重新发送')
-            },op.time*1000)
+                setTimeout(()=>{
+                    reject('超时请重新发送')
+                },op.timer)
+            }
             if (this.port != '') {
                 this.port.write(op.data, err=>{
                     if (err) {
                         reject('Error on write:'+err.message)
                     }else {
-                        resolve('written success')
+                        if(!op.canParseObj){
+                            resolve('write success')
+                        }
                     }
+
                 });
             }else {
                 reject('串口未连接或者不存在')
             }
 
+        })
+    }
+    read(cb){
+        this.pEvent.on('data_proc',data=>{
+           cb(data)
         })
     }
 }
@@ -287,11 +297,11 @@ class reduce_Parse {
         }
     }
 }
-// 扫描枪真解析 返回一个buffer
+// 扫描枪真解析 返回一个buffer len期待返回长度 timer超时
 class ScanGunParse{
-    constructor(len,timer){
-        this.timer=timer
-        this.len=len
+    constructor(){
+        this.timer=5000
+        this.len=14
         this.result=''
         this.lastTime=0
         return this
@@ -310,7 +320,7 @@ class ScanGunParse{
             this.lastTime = Date.now();
         else {
             let nowTime =  Date.now();
-            if (nowTime - this.lastTime > this.timer * 1000) {
+            if (nowTime - this.lastTime > this.timer) {
                 this.reset();
                 failCallBack&&failCallBack('数据超时')
 
@@ -393,7 +403,29 @@ function getBfCheckNumber(bf,le) {
     }
     return fixHexStr(bfe)
 }
+//根据id      hexStr
+//获取回复ID    hexStr
+function getReplyId(id){
+    let num=hexToNum(id)+1
+    let hexStr=numToFixHex(num)
+    while (hexStr.length<8){
+        hexStr='0'+hexStr
+    }
+    return hexStr
+}
+//根据字符串获取hex
+function strToHex(str,len){
+    if(len){
+        let hex =Buffer.from(str).toString('hex')
+        while (hex.length<len*2){
+            hex='0'+hex
+        }
+        return hex
+    }else {
+        return Buffer.from(str).toString('hex')
+    }
 
+}
 module.exports={
     DhPort,
     Can,
@@ -404,7 +436,9 @@ module.exports={
     hexToNum,
     getDataHex,
     getFixHex,
-    getBfCheckNumber
+    getBfCheckNumber,
+    getReplyId,
+    strToHex
 }
 
 //参考资料  ffcc1000010101010101010101010101010101011000 测试数据

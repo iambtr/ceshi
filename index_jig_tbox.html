@@ -1,0 +1,156 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="style.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+<div class="content" id="app">
+	<div class="header">
+		<div class="logo"></div>
+		<div class="logo-title">Tbox测试</div>
+	</div>
+	<div class="set">
+		<div class="set-title">Tbox设置</div>
+		<div class="set-form">
+			<label class="control-label">串口</label>
+			<select class="form-control" style="width: 220px" id="port" v-model="v_tBoxCom">
+				<option v-for="item in portList">{{item.comName}}</option>
+			</select>
+		</div>
+		<div class="set-form">
+			<label class="control-label">波特率</label>
+			<select class="form-control" style="width:120px" id="baudrate">
+				<option>115200</option>
+			</select>
+
+		</div>
+		<div class="form-button">
+			<button class="btn" :class="{'btn-blue':!v_tBoxLink,'btn-gary':v_tBoxLink}" id="connect" :disabled="v_tBoxLink">连接</button>
+			<button class="btn" :class="{'btn-blue':v_tBoxLink,'btn-gary':!v_tBoxLink}" id="disconnect" :disabled="!v_tBoxLink">断开</button>
+		</div>
+	</div>
+	<div class="set" style="display: none">
+		<div class="set-title">测试治具设置</div>
+		<div class="set-form">
+			<label class="control-label">串口</label>
+			<select class="form-control" style="width: 220px" id="portTest" v-model="v_scanCom">
+				<option v-for="item in portList">{{item.comName}}</option>
+			</select>
+		</div>
+		<div class="set-form">
+			<label class="control-label">波特率</label>
+			<select class="form-control" style="width:120px" id="baudrateTest">
+				<option>115200</option>
+			</select>
+		</div>
+		<div class="form-button">
+			<button class="btn" :class="{'btn-blue':!v_scanLink,'btn-gary':v_scanLink}" id="connectTest" :disabled="v_scanLink">连接</button>
+			<button class="btn" :class="{'btn-blue':v_scanLink,'btn-gary':!v_scanLink}" id="disconnectTest" :disabled="!v_scanLink">断开</button>
+		</div>
+	</div>
+	<div class="set">
+		<div class="set-title">扫码枪设置</div>
+		<div class="set-form">
+			<label class="control-label">串口</label>
+			<select class="form-control" style="width: 220px" id="portScan"></select>
+		</div>
+		<div class="set-form">
+			<label class="control-label">波特率</label>
+			<select class="form-control" style="width:120px" id="baudratescan">
+				<option>9600</option>
+			</select>
+		</div>
+		<div class="form-button">
+			<button class="btn btn-blue" id="connectScan">连接</button>
+			<button class="btn btn-gary" id="disconnectScan">断开</button>
+		</div>
+	</div>
+	<div>
+        <span style="float: left;margin-left: -572px;margin-top: 15px;">本次Tbox编号</span>
+        <input type="text" class='form-control' id="vcusn">
+		<!--<span style="float: left;margin-left: 100px;margin-top: 15px;">硬件版本号</span>-->
+		<!--<input type="text" class='form-control' id="hwversion">-->
+    </div>
+	<div  class="table-content" style="display: none">
+		<div class="file-box2">
+			<label class="control-label">选择固件文件</label>
+			<form action="" method="post" enctype="multipart/form-data">
+				<input type='text' name='textfield' id='textfield' class='form-control file-text' />
+				<input type='button' class='btn btn-blue file-btn' value='浏览...' />
+				<!--<input type="file" name="fileField" class="file" id="fileField" size="28" onchange="document.getElementById('textfield').value=this.value;-->
+				<!--document.getElementById('firmwareName').innerHTML= this.files[0]?this.files[0].name:'';-->
+				<!--document.getElementById('firmwareSize').innerHTML= this.files[0]?(parseInt(this.files[0].size/1024) + 'k'):'';-->
+				<!--document.getElementById('firmwareVer').innerHTML= this.files[0]?'v1.0':'';" />-->
+			</form>
+		</div>
+		<div class="file-box2">
+			<label class="control-label">选择音乐文件</label>
+			<form action="" method="post" enctype="multipart/form-data">
+				<input type='text' name='textfield' id='textfield2' class='form-control file-text' />
+				<input type='button' class='btn btn-blue file-btn' value='浏览...' />
+				<!--<input type="file" name="fileField" class="file" id="fileField2" size="28" onchange="document.getElementById('textfield2').value=this.value;-->
+				<!--document.getElementById('musicName').innerHTML= this.files[0]?this.files[0].name:'';-->
+				<!--document.getElementById('musicSize').innerHTML= this.files[0]?(parseInt(this.files[0].size/1024) + 'k'):'';-->
+				<!--document.getElementById('musicVer').innerHTML= this.files[0]?'v1.0':'';" />-->
+			</form>
+		</div>
+		<table class="table">
+			<tr class="title">
+				<td>
+				<td>文件名称</td>
+				<td>文件大小</td>
+				<td>文件版本</td>
+			</tr>
+			<tr>
+				<td>固件文件</td>
+				<td id="firmwareName"></td>
+				<td id="firmwareSize"></td>
+				<td id="firmwareVer"></td>
+			</tr>
+			<tr>
+				<td>音乐文件</td>
+				<td id="musicName"></td>
+				<td id="musicSize"></td>
+				<td id="musicVer"></td>
+			</tr>
+		</table>
+	</div>
+	<div class="start-content">
+		<div class="start-button">
+            <div style="width: 420px">
+                <button class="btn btn-blue start-btn" id="update">开始自检</button>
+                <button class="btn btn-blue start-btn" id="writeTbox">写入tBox编号</button>
+            </div>
+		</div>
+	</div>
+	<div class=" clearfix"></div>
+	<div>
+
+	</div>
+	<div class="testing-tip" id="press" style="">
+		<h3>过程详情</h3>
+		<div class="testing-tip-50">
+			<ol>
+				<li>测试CAN<span class="span1" id="can">测试</span></li>
+				<li>测试CLOCK<span class="span1" id="clock">测试</span></li>
+				<li>测试ADC<span class="span1" id="adc">测试</span></li>
+				<li>测试FLASH<span class="span1" id="flash">测试</span></li>
+			</ol>
+		</div>
+		<div class="testing-tip-50">
+			<ol start="9">
+				<li>测试FATFS<span class="span1" id="fatfs">测试</span></li>
+				<li>测试RTC<span class="span1" id="rtc">测试</span></li>
+				<li>测试mpu6500<span class="span1" id="mpu">测试</span></li>
+				<li>设置Tbox编号<span class="span1" id="setSn">测试</span></li>
+				<!--<li>设置硬件版本<span class="span1" id="setHwv">测试</span></li>-->
+			</ol>
+		</div>
+	</div>
+</div>
+<script src="./vue.min.js"></script>
+<script src="./tbox_main.js"></script>
+</body>
+</html>
