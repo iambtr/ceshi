@@ -1,4 +1,9 @@
+const path       = require('path');
 const dh = require('./dhport')
+const fs         = require('fs');
+const async      = require('async');
+const events     = require("events");
+
 const DhPort=dh.DhPort
 const Can=dh.Can
 const ReduceParse=dh.reduce_Parse
@@ -11,51 +16,85 @@ const numToFixHex=dh.numToFixHex
 const getBfCheckNumber=dh.getBfCheckNumber
 const getReplyId=dh.getReplyId
 const strToHex=dh.strToHex
+const viewEvents=new events.EventEmitter()
 
-//tbox串口
-let portTbox=''
-
+//vcu串口
+let portVcu=''
+//测试治具
+let portTest=''
 //扫码枪串口
 let portScan=''
+
 //应用app
 const App=new Vue({
     el:'#app',
     data:{
         portList:[],
-        v_tBoxCom:'',
-        v_tBoxLink:false,
+        v_vcuCom:'',
+        v_vcuLink:false,
+        v_testCom:'',
+        v_testLink:false,
         v_scanCom:'',
         v_scanLink:false,
-        v_scanTboxNum:'',
+        v_scanVcuNum:'',
+        v_hardNum:'',
         resultNotify:'测试中输出提示相关',
         warn:false,
         testList1:[{
+            name:'测试电压',
+            test:true,
+            status:'ready'//ok fail
+        },{
+            name:'下载固件',
+            test:true,
+            status:'ready'//ok fail
+        },{
+            name:'下载音乐',
+            test:true,
+            status:'ready'//ok fail
+        },{
+            name:'语音播放测试',
+            test:true,
+            status:'ready'//ok fail
+        },{
             name:'测试CAN',
             test:true,
             status:'ready'//ok fail
         },{
-            name:'测试CLOCK',
+            name:'测试485',
             test:true,
             status:'ready'//ok fail
         },{
-            name:'测试ADC',
+            name:'测试数据蓝牙',
             test:true,
             status:'ready'//ok fail
         },{
-            name:'测试FLASH',
+            name:'测试音频蓝牙',
             test:true,
             status:'ready'//ok fail
         }],
         testList2:[{
-            name:'测试FATFS',
+            name:'RTC状态',
             test:true,
             status:'ready'//ok fail
         },{
-            name:'测试RTC',
+            name:'设置RTC',
             test:true,
             status:'ready'//ok fail
         },{
-            name:'测试mpu6500',
+            name:'输入输出测试',
+            test:true,
+            status:'ready'//ok fail
+        },{
+            name:'遥控器测试',
+            test:true,
+            status:'ready'//ok fail
+        },{
+            name:'设置vcu编号',
+            test:true,
+            status:'ready'//ok fail
+        },{
+            name:'设置硬件版本',
             test:true,
             status:'ready'//ok fail
         }]
@@ -68,6 +107,8 @@ const App=new Vue({
         closeConnect,
         createScanConnect,
         closeScanConnect,
+        createTestConnect,
+        closeTestConnect,
         startCheck,
         writeTbox,
         resetTest,
@@ -82,6 +123,7 @@ const App=new Vue({
             this.resultNotify = str
             this.warn=true
         }
+
     }
 })
 // 获取串口列表
@@ -109,12 +151,14 @@ function createScanConnect(){
             autoOpen: false
         });
         // 设置tbox编码
-        portRead(portScan,ScanGunParse,'reduceProcess',data=>{
-            App.v_scanTboxNum = data.toString()
-            App.alert('扫描成功输出：'+data.toString())
-        },err=>{
-            App.error('扫描失败输出：'+err)
-        })
+        portRead(portScan,ScanGunParse,'reduceProcess')
+            .then(data=>{
+                App.v_scanVcuNum = data.toString()
+                App.alert('扫描成功输出：'+data.toString())
+            })
+            .catch(err=>{
+                App.error('扫描失败输出：'+err)
+            })
     }
 
     portScan.open().then(msg=>{
@@ -129,33 +173,31 @@ function closeScanConnect() {
     portScan.close()
         .then(function (msg) {
             App.v_scanLink = false
-            App.resultNotify = '扫码枪关闭成功输出:'+msg
-            App.warn = false
+            App.alert('扫码枪关闭成功输出:'+msg)
         })
         .catch(function (err) {
-            App.resultNotify = '扫码枪关闭失败输出：'+err
-            App.warn = true
+            App.error('扫码枪关闭失败输出：'+err)
         });
 }
 
-//根据所选串口与tbox板建立连接
+//根据所选串口与vcu板建立连接
 function createConnect(){
-    let COM=App.v_tBoxCom
+    let COM=App.v_vcuCom
     if(!COM){
         alert('请先选择串口')
         return
     }
-    if(!portTbox||portTbox.comName!=COM){
+    if(!portVcu||portVcu.comName!=COM){
         // 实例化一个串口类
-        portTbox = new DhPort({
+        portVcu = new DhPort({
             comName: COM,
             baudRate: 115200,
             autoOpen: false
         });
     }
-    portTbox.open()
+    portVcu.open()
         .then(msg=>{
-            App.v_tBoxLink = true
+            App.v_vcuLink = true
             App.alert('tBox串口打开成功输出:'+msg)
         })
         .catch(err=>{
@@ -164,9 +206,9 @@ function createConnect(){
 }
 //带触发断开与vcu板连接
 function closeConnect() {
-    portTbox.close()
+    portVcu.close()
         .then(function (msg) {
-            App.v_tBoxLink = false
+            App.v_vcuLink = false
             App.alert('tBox串口关闭成功输出:'+msg)
         })
         .catch(function (err) {
@@ -175,7 +217,7 @@ function closeConnect() {
 }
 // 开始自检
 function startCheck() {
-    if(!App.v_tBoxLink){
+    if(!App.v_vcuLink){
         alert('请先连接tBox')
         return
     }
@@ -189,7 +231,7 @@ function startCheck() {
         format:1,
         remoteType:1
     }
-    portWriteWithReply(portTbox,writeCan,ReduceParse,'reduceProcess',2000)
+    portWriteWithReply(portVcu,writeCan,ReduceParse,'reduceProcess',1000)
         .then(data=>{
             checkSelf(hexToNum(data.slice(0,2)))
             App.alert('tBox自检成功')
@@ -200,8 +242,8 @@ function startCheck() {
 }
 //写tbox
 function writeTbox() {
-    let tBoxNo=App.v_scanTboxNum
-    if(!App.v_tBoxLink){
+    let tBoxNo=App.v_scanVcuNum
+    if(!App.v_vcuLink){
         alert('请先连接tBox')
         return
     }
@@ -220,7 +262,7 @@ function writeTbox() {
         remoteType: 0
     }
     //解密
-    portWriteNoReply(portTbox, writeCan).catch(err => {
+    portWriteNoReply(portVcu, writeCan).catch(err => {
         App.error('解密失败:'+err)
         return
     })
@@ -236,17 +278,17 @@ function writeTbox() {
     }
     let tBoxCans = getWriteCans(tBoxNo, '0200000001', can)
     //第一帧
-    portWriteNoReply(portTbox, tBoxCans[0]).catch(err => {
+    portWriteNoReply(portVcu, tBoxCans[0]).catch(err => {
         App.error('第1帧写入失败:'+err)
         return
     })
     //第2帧
-    portWriteNoReply(portTbox, tBoxCans[1]).catch(err => {
+    portWriteNoReply(portVcu, tBoxCans[1]).catch(err => {
         App.error('第2帧写入失败:'+err)
         return
     })
     //第3帧
-    portWriteWithReply(portTbox, tBoxCans[2], ReduceParse, 'reduceProcess', 1000)
+    portWriteWithReply(portVcu, tBoxCans[2], ReduceParse, 'reduceProcess', 1000)
         .then(data => {
             if (hexToNum(data) == 1) {
                 App.alert('tBox写入成功')
@@ -258,7 +300,6 @@ function writeTbox() {
             App.error('tBox写入失败:'+err)
         })
 }
-
 //传入14字节的tboxNumber 封装成多个帧对象返回回调
 /*
 * str:要写入的 字符 如tbox编码
@@ -320,7 +361,6 @@ function portWriteWithReply(port,data,canParseClass,canParseFn,timer){
         }
         port.write(writeOption)
             .then(resData=>{
-                console.log('回复：'+resData.toString('hex'))
                 let resCan=new Can().init(resData.toString('hex'))
                 if(resCan.id==replyId){
                     resolve(resCan.data)
@@ -346,7 +386,7 @@ function portWriteNoReply(port,data){
         }
         port.write(writeOption)
             .then(resData=>{
-               resolve(resData)
+                resolve(resData)
             })
             .catch(err=>{
                 reject(err)
@@ -360,8 +400,8 @@ function portWriteNoReply(port,data){
 *   canParseClass 对读的数据结果处理类    类名
 *   canParseFn canParseClass的处理主方法名 字符串
 * */
-function portRead(port,canParseClass,canParseFn,successcb,failcb){
-    /*return new Promise((resolve,reject)=>{
+function portRead(port,canParseClass,canParseFn){
+    return new Promise((resolve,reject)=>{
         let canParse=new canParseClass()
         port.read((data)=>{
             canParse[canParseFn](data,endData=>{
@@ -370,15 +410,7 @@ function portRead(port,canParseClass,canParseFn,successcb,failcb){
                 reject(err)
             })
         })
-    })*/
-        let canParse=new canParseClass()
-        port.read((data)=>{
-            canParse[canParseFn](data,endData=>{
-                successcb(endData)
-            },err=>{
-                failcb(err)
-            })
-        })
+    })
 }
 // 样式重置
 function resetTest() {

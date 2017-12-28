@@ -1,6 +1,7 @@
 ﻿const SerialPort = require("serialport");              //串口
 const events = require("events");                  //事件
 const StateMachine = require('javascript-state-machine');//有限状态机
+
 /*let obj={
     head:'ffcc',
     type:'ee',
@@ -151,7 +152,6 @@ class DhPort {
             }else {
                 reject('串口未连接或者不存在')
             }
-
         })
     }
     read(cb){
@@ -424,6 +424,10 @@ function strToHex(str,len){
     }else {
         return Buffer.from(str).toString('hex')
     }
+
+}
+//传入hexId 返回buffer里面翻转的idHex
+function reverseId(id){
 
 }
 module.exports={

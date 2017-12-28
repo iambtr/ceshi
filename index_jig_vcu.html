@@ -6,7 +6,7 @@
 </head>
 
 <body>
-<div class="content">
+<div class="content" id="app">
 	<div class="header">
 		<div class="logo"></div>
 		<div class="logo-title">全车固件更新</div>
@@ -15,7 +15,9 @@
 		<div class="set-title">VCU板设置</div>
 		<div class="set-form">
 			<label class="control-label">串口</label>
-			<select class="form-control" style="width: 220px" id="port"></select>
+			<select class="form-control" style="width: 220px" v-model="v_vcuCom">
+				<option v-for="item in portList">{{item.comName}}</option>
+			</select>
 		</div>
 		<div class="set-form">
 			<label class="control-label">波特率</label>
@@ -24,15 +26,17 @@
 			</select>
 		</div>
 		<div class="form-button">
-			<button class="btn btn-blue" id="connect">连接</button>
-			<button class="btn btn-gary" id="disconnect">断开</button>
+			<button class="btn" :class="{'btn-blue':!v_vcuLink,'btn-gary':v_vcuLink}" @click="createConnect" :disabled="v_vcuLink">连接</button>
+			<button class="btn" :class="{'btn-blue':v_vcuLink,'btn-gary':!v_vcuLink}" @click="closeConnect" :disabled="!v_vcuLink">断开</button>
 		</div>
 	</div>
 	<div class="set">
 		<div class="set-title">测试治具设置</div>
 		<div class="set-form">
 			<label class="control-label">串口</label>
-			<select class="form-control" style="width: 220px" id="portTest"></select>
+			<select class="form-control" style="width: 220px" id="portTest" v-model="v_testCom">
+				<option v-for="item in portList">{{item.comName}}</option>
+			</select>
 		</div>
 		<div class="set-form">
 			<label class="control-label">波特率</label>
@@ -41,15 +45,17 @@
 			</select>
 		</div>
 		<div class="form-button">
-			<button class="btn btn-blue" id="connectTest">连接</button>
-			<button class="btn btn-gary" id="disconnectTest">断开</button>
+			<button class="btn" :class="{'btn-blue':!v_testLink,'btn-gary':v_testLink}" @click="createTestConnect" :disabled="v_testLink">连接</button>
+			<button class="btn" :class="{'btn-blue':v_testLink,'btn-gary':!v_testLink}" @click="closeTestConnect" :disabled="!v_testLink">断开</button>
 		</div>
 	</div>
 	<div class="set">
 		<div class="set-title">扫码枪设置</div>
 		<div class="set-form">
 			<label class="control-label">串口</label>
-			<select class="form-control" style="width: 220px" id="portScan"></select>
+			<select class="form-control" style="width: 220px" id="portScan" v-model="v_scanCom">
+				<option v-for="item in portList">{{item.comName}}</option>
+			</select>
 		</div>
 		<div class="set-form">
 			<label class="control-label">波特率</label>
@@ -58,15 +64,15 @@
 			</select>
 		</div>
 		<div class="form-button">
-			<button class="btn btn-blue" id="connectScan">连接</button>
-			<button class="btn btn-gary" id="disconnectScan">断开</button>
+			<button class="btn" :class="{'btn-blue':!v_scanLink,'btn-gary':v_scanLink}" @click="createScanConnect" :disabled="v_scanLink">连接</button>
+			<button class="btn" :class="{'btn-blue':v_scanLink,'btn-gary':!v_scanLink}" @click="closeScanConnect" :disabled="!v_scanLink">断开</button>
 		</div>
 	</div>
 	<div>
         <span style="float: left;margin-left: -572px;margin-top: 15px;">本次VCU编号</span>
-        <input type="text" class='form-control' id="vcusn">
+        <input type="text" class='form-control' id="vcusn" :value="v_scanVcuNum">
 		<span style="float: left;margin-left: 100px;margin-top: 15px;">硬件版本号</span>
-		<input type="text" class='form-control' id="hwversion">
+		<input type="text" class='form-control' id="hwversion" :value="v_hardNum">
     </div>
 	<div  class="table-content" style="display: none">
 		<div class="file-box2">
@@ -118,10 +124,7 @@
 		</div>
 	</div>
 	<div class=" clearfix"></div>
-	<div>
-
-	</div>
-	<div class="testing-tip" id="press" style="">
+	<div class="testing-tip" id="press">
 		<h3>过程详情</h3>
 		<div class="testing-tip-50">
 			<ol>
@@ -184,8 +187,10 @@
 			</ol>
 		</div>
 	</div>
+	<div class=" clearfix"></div>
+	<div class='log' :class="{'alert-success':!warn,'alert-warn':warn}">{{resultNotify}}</div>
 </div>
-<script src="./iap_js/iap_main_jig_new.js" ></script>
-<!--<script src="jquery-2.1.4.min.js" type="text/javascript"></script>-->
+<script src="./vue.min.js"></script>
+<script src="./vcu_main.js"></script>
 </body>
 </html>
