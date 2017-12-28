@@ -1,19 +1,34 @@
 ﻿const SerialPort = require("serialport");              //串口
 const events = require("events");                  //事件
 const StateMachine = require('javascript-state-machine');//有限状态机
+/*
+* 帧对象 就是数据 用来数据包装和返回
+* 三种情况 回复帧 开头帧 数据帧
+*
+* */
+class MCan{
+    constructor(op){
+        this.isFirst=false
+        this.reply=false
+        this.total=''
+        this.canNow=''
+        this.msgType=''
+        this.id=''
+        this.data=''
+        this.hex=''
+        return this
+    }
+    init(){
+        
+    }
+}
 
-/*let obj={
-    head:'ffcc',
-    type:'ee',
-    id:'11111111',
-    data:0,
-    len:8,
-    ch:0,
-    format:1,
-    remoreType:1
-}*/
-
-class Can{
+/*
+*类 用于处理串口实际收发buffer
+*   init 传入hex返回对象
+*   init 传入对象返回hex
+**/
+class CanBuffer{
     constructor(){
         this.opt={
             head:'ffcc',
@@ -45,7 +60,6 @@ class Can{
         let resBf=''
         resBf=obj.head+'00'+'11'+obj.type+obj.id+getDataHex(obj.data,obj.len)+numToFixHex(obj.len)+numToFixHex(obj.ch)+numToFixHex(obj.format)+numToFixHex(obj.remoteType)
         return Buffer.from(getAllHex(resBf),'hex')
-
     }
     init(op){
         if(/string/gi.test(op.constructor)){
@@ -58,6 +72,11 @@ class Can{
         }
     }
 }
+/*
+* 类串口
+*   收发数据的串口
+*
+* */
 class DhPort {
     constructor(option) {
         this.life = false
@@ -178,7 +197,6 @@ class reduce_Parse {
     last_time: any;
 
     constructor() {
-
         //状态机
         this.fsm = new StateMachine({
             init: 'FF',
@@ -433,6 +451,7 @@ function reverseId(id){
 module.exports={
     DhPort,
     Can,
+    CanBuffer,
     ScanGunParse,
     reduce_Parse,
     numToFixHex,
