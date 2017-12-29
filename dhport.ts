@@ -7,19 +7,65 @@ const StateMachine = require('javascript-state-machine');//有限状态机
 *
 * */
 class MCan{
-    constructor(op){
-        this.isFirst=false
-        this.reply=false
+    constructor(canHexStr){
+        this.canType=''
         this.total=''
         this.canNow=''
         this.msgType=''
         this.id=''
         this.data=''
         this.hex=''
+        this.init(canHexStr)
         return this
     }
-    init(){
-        
+    /*
+    * 00 回复帧或者首帧
+    *   00 回复
+    *   其他首帧
+    * 非00
+    *   数据帧
+    * */
+    init(canHexStr){
+        switch (canHexStr.slice(0, 2)) {
+
+            case '00':
+                if(canHexStr.slice(2,4)=='00'){
+                    this.setReplyCan(canHexStr)
+                }else {
+                    this.setFirstCan(canHexStr)
+                }
+                break;
+            default:
+                this.setDataCan(canHexStr)
+        }
+    }
+    /*
+    * canType  first data reply
+    * */
+    setFirstCan(op){
+        this.canType='first'
+        this.total=hexToNum(op.slice(2,4))
+        this.canNow=hexToNum(op.slice(0,2))
+        this.msgType=hexToNum(op.slice(4,6))
+        this.id=op.slice(6,12)
+        this.checkNum=hexToNum(reverseHex(op.slice(12)))
+        this.hex=op
+        return this
+    }
+    setDataCan(op){
+        this.canType='data'
+        this.canNow=hexToNum(op.slice(0,2))
+        this.data=op.slice(2)
+        this.hex=op
+        return this
+    }
+    setReplyCan(op){
+        this.canType='reply'
+        this.msgType=hexToNum(op.slice(4,6))
+        this.id=op.slice(6,12)
+        this.data=op.slice(12)
+        this.hex=op
+        return this
     }
 }
 
@@ -38,13 +84,12 @@ class CanBuffer{
             len:8,
             ch:0,
             format:1,
-            remoteType:1
+            remoteType:0
         }
         return this
     }
 
     canPrase(hexStr){
-        console.log(hexStr)
         this.opt['head']=hexStr.slice(0,4)
         this.opt['type']=hexStr.slice(8,10)
         this.opt['id']=hexStr.slice(10,18)
@@ -108,75 +153,57 @@ class DhPort {
     }
     open() {
         return new Promise((resolve, reject) => {
-            if (this.port != '') {
-                this.port.open(err => {
-                    if (!err) {
-                        let msg = `已连接：${this.comName}，波特率：${this.baudRate}`;
-                        //接收开始
-                        if(!this.life){
-                            this.port.on('data', data=> {
-                                this.pEvent.emit("data_proc", data);
-                            });
-                            this.life=!this.life
-                        }
-                        resolve(msg)
-                    } else {
-                        reject('打开串口错误：'+err.message)
+            this.port.open(err => {
+                if (!err) {
+                    let msg = `已连接：${this.comName}，波特率：${this.baudRate}`;
+                    //接收开始
+                    if (!this.life) {
+                        this.port.on('data', data=> {
+                            this.pEvent.emit("data_proc", data);
+                        });
+                        this.life = !this.life
                     }
-                })
-            }
+                    resolve(msg)
+                } else {
+                    reject('打开串口错误：' + err.message)
+                }
+            })
         })
     }
+
     //关闭串口
     close() {
         return new Promise((resolve, reject) => {
-            if (this.port != '') {
-                this.port.close(err => {
-                    if (!err) {
-                        let msg = `已关闭：${this.comName}，波特率：${this.baudRate}`;
-                        resolve(msg)
-                    } else {
-                        reject('关闭串口错误:'+err.message)
-                    }
-                })
-            }
+            this.port.close(err => {
+                if (!err) {
+                    let msg = `已关闭：${this.comName}，波特率：${this.baudRate}`;
+                    resolve(msg)
+                } else {
+                    reject('关闭串口错误:' + err.message)
+                }
+            })
         })
     }
-    write(op) {
-        return new Promise((resolve,reject)=>{
-            if(op.canParseObj){
-                this.pEvent.on('data_proc',data=>{
-                    console.log('未解析'+data.toString('hex'))
-                    op.analyse.call(op.canParseObj, data, endData => {
-                        resolve(endData)
-                    }, err => {
-                        reject(err)
-                    })
-                })
-                setTimeout(()=>{
-                    reject('超时请重新发送')
-                },op.timer)
-            }
-            if (this.port != '') {
-                this.port.write(op.data, err=>{
-                    if (err) {
-                        reject('Error on write:'+err.message)
-                    }else {
-                        if(!op.canParseObj){
-                            resolve('write success')
-                        }
-                    }
 
-                });
-            }else {
-                reject('串口未连接或者不存在')
-            }
+    write(data) {
+        return new Promise((resolve, reject)=> {
+            this.port.write(data, err=> {
+                if (err) {
+                    reject('Error on write:' + err.message)
+                } else {
+                    resolve('write success')
+                }
+            });
         })
     }
-    read(cb){
-        this.pEvent.on('data_proc',data=>{
-           cb(data)
+
+    register(id) {
+        this.pEvent.on('data_proc', data=> {
+            this.pEvent.emit(id,data)
         })
+    }
+    removeRegister(id,fn){
+        this.pEvent.removeListener(id,fn)
     }
 }
 
@@ -431,26 +458,37 @@ function getReplyId(id){
     }
     return hexStr
 }
-//根据字符串获取hex
+//根据字符或者数字串获取hex数据
 function strToHex(str,len){
+    if(/number/gi.test(str.constructor)){
+        str=Buffer.from(numToFixHex(str),'hex').toString()
+    }
     if(len){
         let hex =Buffer.from(str).toString('hex')
         while (hex.length<len*2){
-            hex='0'+hex
+            hex=hex+'0'
         }
         return hex
     }else {
         return Buffer.from(str).toString('hex')
     }
-
 }
 //传入hexId 返回buffer里面翻转的idHex
-function reverseId(id){
-
+function reverseHex(id){
+    let bfId=[]
+    for(let i=0;i<id.length/2;i++){
+        bfId.unshift(id.slice(i*2,i*2+2))
+    }
+    return bfId.join('')
+}
+function getBfCan(can){
+    can.data=strToHex(can.data)
+    can.id=reverseHex(can.id)
+    return can
 }
 module.exports={
     DhPort,
-    Can,
+    MCan,
     CanBuffer,
     ScanGunParse,
     reduce_Parse,
@@ -461,7 +499,9 @@ module.exports={
     getFixHex,
     getBfCheckNumber,
     getReplyId,
-    strToHex
+    strToHex,
+    reverseHex,
+    getBfCan
 }
 
 //参考资料  ffcc1000010101010101010101010101010101011000 测试数据
