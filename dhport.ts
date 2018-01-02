@@ -49,6 +49,7 @@ class MCan{
         this.msgType=hexToNum(op.slice(4,6))
         this.id=op.slice(6,12)
         this.checkNum=hexToNum(reverseHex(op.slice(12)))
+        this.data=op.slice(2,12)
         this.hex=op
         return this
     }
@@ -253,6 +254,7 @@ class reduce_Parse {
     reduceProcess(buff,successCallBack,failCallBack) {
         //检查超时
         this.check_timer(failCallBack);
+        console.log('buffer',buff.toString('hex'))
         for (var i = 0; i < buff.length; i++) {
             var chr = buff[i];
             switch (this.fsm.state) {
@@ -279,6 +281,8 @@ class reduce_Parse {
                         //收到回复
                         this.use_data[2]=chr
                         this.fsm.len2();
+                    }else {
+                        this.clear();
                     }
                     break;
                 case 'LEN2':
