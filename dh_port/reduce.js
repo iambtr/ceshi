@@ -1,6 +1,6 @@
 const StateMachine = require('javascript-state-machine');//有限状态机
 //精简帧解析 返回一个buffer
-class reduce_Parse {
+class ReduceParse {
     constructor() {
         //状态机
         this.fsm = new StateMachine({
@@ -15,7 +15,10 @@ class reduce_Parse {
                 {name: 'ff', from: ['FF', 'AA', 'LEN1', 'LEN2', 'DATA', 'SUM1', 'SUM2'], to: 'FF'}
             ]
         });
-
+        this.init()
+        return this
+    }
+    init(){
         this.use_data_len = 0;//收到说明数据字节数
         this.use_data =Buffer.alloc(23);
         this.use_data_cnt = 0;
@@ -26,13 +29,12 @@ class reduce_Parse {
         this.use_sum = 0;
         this.isframe_ok = false;
         this.last_time = 0;
-        return this
     }
 
     reduceProcess(buff,successCallBack,failCallBack) {
         //检查超时
         this.check_timer(failCallBack);
-        console.log('buffer',buff.toString('hex'))
+        console.log('buffer来的数据',buff.toString('hex'))
         for (var i = 0; i < buff.length; i++) {
             var chr = buff[i];
             switch (this.fsm.state) {
@@ -105,8 +107,8 @@ class reduce_Parse {
 
 
     clear() {
-        this.fsm.ff();
-        this.constructor();
+        this.fsm.ff()
+        this.init()
     }
 
     check_timer(failCallBack) {
@@ -124,43 +126,35 @@ class reduce_Parse {
         }
     }
 }
-// 扫描枪真解析 返回一个buffer len期待返回长度 timer超时
-class ScanGunParse{
-    constructor(){
+// 特定的字符串长度帧解析  len 长度
+class ForLenStrParse{
+    constructor(len){
         this.timer=5000
-        this.len=14
+        this.len=len
         this.result=''
-        this.lastTime=0
+        this.checkTimer=''
         return this
     }
     reduceProcess(buffer,successCallBack,failCallBack){
-        this.checkTimer(failCallBack)
+        this.checkTime(failCallBack)
         let str=buffer.toString()
         this.result=this.result+str
         if(this.result.length>=this.len){
+            clearTimeout(this.checkTimer)
             successCallBack(Buffer.from(this.result.slice(0,this.len)))
             this.reset();
         }
     }
-    checkTimer(failCallBack){
-        if (this.lastTime == 0)
-            this.lastTime = Date.now();
-        else {
-            let nowTime =  Date.now();
-            if (nowTime - this.lastTime > this.timer) {
-                this.reset();
-                failCallBack&&failCallBack('数据超时')
-
-            }
-            else {
-                this.lastTime = nowTime;
-            }
-        }
+    checkTime(failCallBack){
+        clearTimeout(this.checkTimer)
+        this.checkTimer= setTimeout(()=>{
+            this.reset();
+            failCallBack && failCallBack('数据超时')
+        },this.timer)
     }
     reset(){
         this.result=''
-        this.lastTime=0
     }
 
 }
-module.exports={reduce_Parse,ScanGunParse}
+module.exports={ReduceParse,ForLenStrParse}

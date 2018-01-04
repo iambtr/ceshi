@@ -21,10 +21,16 @@
     "async": "^1.5.0",
     "i": "^0.3.6",
     "javascript-state-machine": "^3.0.1",
-    "serialport": "^4.0.7"
+    "serialport": "^4.0.7",
+    "vue": "^2.5.13"
   },
   "devDependencies": {
     "electron": "^1.4.1",
     "electron-packager": "^8.5.2"
+  },
+  "resolve": {
+    "alias": {
+      "vue": "vue/dist/vue.js"
+    }
   }
 }

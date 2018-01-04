@@ -133,12 +133,12 @@
 		<h3>过程详情</h3>
 		<div class="testing-tip-50">
 			<ol>
-				<li v-for="item in testList1">{{item.name}}<span class="span1" @click="changeTestItem(item)" v-if="item.test&&item.status=='ready'">{{item.test?'不测试':'测试'}}</span><span class="span1"  v-else-if="!item.test" @click="changeTestItem(item)">{{item.test?'不测试':'测试'}}</span><span class="span1" :class="{'greey-color':item.status=='ok','red-color':item.status=='fail'}" v-else>{{item.status=='ok'?'正常':'异常'}}</span></li>
+				<li v-for="item in testList1" class="test-item" :class="{del:!item.test}"><input type="checkbox" v-model="item.test">{{item.name}}<span class="span1" v-if="item.test&&item.status=='ready'">{{'待测试'}}</span><span class="span1"  v-else-if="!item.test">{{'待测试'}}</span><span class="span1" :class="{'greey-color':item.status=='ok','red-color':item.status=='fail'}" v-else>{{item.status=='ok'?'正常':'异常'}}</span></li>
 			</ol>
 		</div>
 		<div class="testing-tip-50">
-			<ol start="9">
-				<li v-for="item in testList2">{{item.name}}<span class="span1" @click="changeTestItem(item)" v-if="item.test&&item.status=='ready'">{{item.test?'不测试':'测试'}}</span><span class="span1"  v-else-if="!item.test" @click="changeTestItem(item)">{{item.test?'不测试':'测试'}}</span><span class="span1" :class="{'greey-color':item.status=='ok','red-color':item.status=='fail'}" v-else>{{item.status=='ok'?'正常':'异常'}}</span></li>
+			<ol start="6">
+				<li v-for="item in testList2" class="test-item" :class="{del:!item.test}"><input type="checkbox" v-model="item.test"> {{item.name}}<span class="span1" v-if="item.test&&item.status=='ready'">{{'待测试'}}</span><span class="span1"  v-else-if="!item.test">{{'待测试'}}</span><span class="span1" :class="{'greey-color':item.status=='ok','red-color':item.status=='fail'}" v-else>{{item.status=='ok'?'正常':'异常'}}</span></li>
 				<!--<li>设置硬件版本<span class="span1" id="setHwv">测试</span></li>-->
 			</ol>
 		</div>
@@ -146,7 +146,6 @@
 	<div class=" clearfix"></div>
 	<div class="log" :class="{'alert-success':!warn,'alert-warn':warn}">{{resultNotify}}</div>
 </div>
-<script src="./vue.min.js"></script>
 <script src="./tbox_main.js"></script>
 </body>
 </html>

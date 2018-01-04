@@ -1,21 +1,9 @@
-const dh = require('./dhport.js')
-const DhPort = dh.DhPort
-const CanBuffer = dh.CanBuffer
-const MCan = dh.MCan
-const ReduceParse = dh.reduce_Parse
-const ScanGunParse = dh.ScanGunParse
-const getAllHex = dh.getAllHex
-const getDataHex = dh.getDataHex
-const getFixHex = dh.getFixHex
-const hexToNum = dh.hexToNum
-const numToFixHex = dh.numToFixHex
-const getBfCheckNumber = dh.getBfCheckNumber
-const getReplyId = dh.getReplyId
-const strToHex = dh.strToHex
-const reverseHex = dh.reverseHex
+const Vue=require('vue/dist/vue.min')
+const DhPort = require('./dh_port/port')
+const {ReduceParse,ForLenStrParse} = require('./dh_port/reduce')
+const {portReadByReduce,portWriteWithReply,portWriteNoReply}=require('./dh_port/port_logic')
 const events = require('events')
 const appEventManage = new events.EventEmitter()
-const getBfCan = dh.getBfCan
 //tbox串口
 let portTbox = ''
 
@@ -76,9 +64,6 @@ const App = new Vue({
         writeTbox,
         resetTest,
         clickT,
-        changeTestItem(item) {
-            item.test = !item.test
-        },
         alert(str) {
             this.resultNotify = str
             this.warn = false
@@ -91,7 +76,7 @@ const App = new Vue({
 })
 // 测试专用
 function clickT(){
-    let writeCan = {
+    /*let writeCan = {
         id: '002003B9',
         data: 0,
         remoteType: 1
@@ -108,8 +93,31 @@ function clickT(){
         portTbox.pEvent.emit('data_proc',Buffer.from('ffaa0111eeb903200100020000000165030800010003fa','hex'))
         portTbox.pEvent.emit('data_proc',Buffer.from('ffaa0111eeb90320010154314d48303148080001000553','hex'))
         portTbox.pEvent.emit('data_proc',Buffer.from('ffaa0111eeb90320010259413831313239080001000530','hex'))
-    },80)
-
+    },80)*/
+console.log('测试用的')
+    let can = {
+        id: '00200104',
+        data:0,
+        remoteType:1
+    }
+    // let tBoxNo='T1MH01HYA81129'
+    // ffcc0011ee0401210000000000000000000800010102fa
+    portWriteWithReply(portTbox, can, ReduceParse, 'reduceProcess', 2000)
+        .then(data => {
+            //读取tbox编号比较
+            console.log('重启',data)
+            let tboxReadNum=Buffer.from(data,'hex').toString()
+            App.alert(data.toString('hex'))
+            /*if(tboxReadNum==tBoxNo){
+                App.alert('tBox已经写入并校验成功')
+            }else {
+                App.error('tBox写入校验失败:读取的tBox编号' + Buffer.from(data,'hex').toString())
+            }
+*/
+        })
+        .catch(err => {
+            App.error('tBox写入失败:读取tbox编号失败' + err)
+        })
 }
 
 // 获取串口列表
@@ -138,7 +146,7 @@ function createScanConnect() {
             autoOpen: false
         });
         // 设置tbox编码
-        portReadByReduce(portScan, 'scan', ScanGunParse, 'reduceProcess', data => {
+        portReadByReduce(portScan, 'scan', ForLenStrParse, 'reduceProcess', data => {
             App.v_scanTboxNum = data.toString()
             App.alert('扫描成功输出：' + data.toString())
         }, err => {
@@ -257,9 +265,28 @@ function writeTbox() {
         .then(data => {
             if (data == '01') {
                 App.alert('tBox已经写入,下面重启校验')
-//重启
                 let can = {
                     id: '00200201',
+                    data:0,
+                    remoteType:1
+                }
+
+                portWriteWithReply(portTbox, can, ReduceParse, 'reduceProcess', 2000)
+                    .then(data => {
+                        //读取tbox编号比较
+                        let tboxReadNum=Buffer.from(data,'hex').toString()
+                        if(tboxReadNum==tBoxNo){
+                            App.alert('tBox已经写入并校验成功')
+                        }else {
+                            App.error('tBox写入校验失败:读取的tBox编号' + Buffer.from(data,'hex').toString())
+                        }
+                    })
+                    .catch(err => {
+                        App.error('tBox写入失败:读取tbox编号失败' + err)
+                    })
+//重启
+                /*let can = {
+                    id: '00200104',
                     data:0,
                     remoteType:1
                 }
@@ -283,7 +310,6 @@ function writeTbox() {
                                 }else {
                                     App.error('tBox写入校验失败:读取的tBox编号' + Buffer.from(data,'hex').toString())
                                 }
-
                             })
                             .catch(err => {
                                 App.error('tBox写入失败:读取tbox编号失败' + err)
@@ -291,7 +317,7 @@ function writeTbox() {
                     })
                     .catch(err => {
                         App.error('tBox写入失败:重启失败' + err)
-                    })
+                    })*/
             } else {
                 App.error('tBox返回：tBox写入失败')
             }
@@ -302,265 +328,6 @@ function writeTbox() {
 
 }
 
-//传入14字节的tboxNumber 封装成多个帧对象返回回调
-/*
-* data 对象包含head,type,data,id,len,ch,format,remoteType
-* */
-function getWriteCans(data) {
-    let canTotal = Math.ceil(data.data.length / 14)
-    let lastLen = data.data.length % 14 == 0 ? 8 : (data.data.length % 14 / 2 + 1)
-    let cansHeadHexStr = numToFixHex(canTotal) + '00' + data.uniqueId||'000001'
-    let conBf = Buffer.concat([Buffer.from(cansHeadHexStr, 'hex'), Buffer.from(data.data, 'hex')])
-    let arr = []
-    for (let i = 0; i < canTotal + 1; i++) {
-        if (i == 0) {
-            let writeCan = {
-                id: data.id,
-                data: numToFixHex(i) + cansHeadHexStr + getBfCheckNumber(conBf, true),
-                len: data.len || 8,
-                ch: data.ch || 0,
-                format: data.format || 1,
-                remoteType: data.remoteType || 0
-            }
-            let bfCanData = new CanBuffer().init(writeCan)
-            arr.push(bfCanData)
-        } else if (i == canTotal) {
-            let writeCan = {
-                id: data.id,
-                data: numToFixHex(i) + data.data.slice((i - 1) * 14, i * 14),
-                len: lastLen,
-                ch: data.ch || 0,
-                format: data.format || 1,
-                remoteType: data.remoteType || 0
-            }
-            let bfCanData = new CanBuffer().init(writeCan)
-            arr.push(bfCanData)
-        } else {
-            let writeCan = {
-                id: data.id,
-                data: numToFixHex(i) + data.data.slice((i - 1) * 14, i * 14),
-                len: data.len || 8,
-                ch: data.ch || 0,
-                format: data.format || 1,
-                remoteType: data.remoteType || 0
-            }
-            let bfCanData = new CanBuffer().init(writeCan)
-            arr.push(bfCanData)
-        }
-    }
-    return arr
-}
-
-/*
-* 串口发数据有回复 如分帧最后一帧 自检
-* 参数
-*   port 串口实例化对象    对象
-*   data 数据对象  类似帧
-*   canParseClass 对读的数据结果处理类    类名
-*   canParseFn canParseClass的处理主方法名 字符串
-*   timer 期待回复的超时时间
-* */
-function portWriteWithReply(port, data, canParseClass, canParseFn, timer) {
-    let id = data.id
-    data = getBfCan(data)
-    let replyId = getReplyId(data.id)
-    let canParse = new canParseClass()
-    let readReduce = function (data) {
-        canParse[canParseFn](data, endData => {
-            let resCan = new CanBuffer().init(endData.toString('hex'))
-            console.log(resCan.id,replyId,resCan.id == replyId)
-            if (resCan.id == replyId) {
-                port.pEvent.emit(id + 'data', true, resCan.data)
-            }
-        }, err => {
-            port.pEvent.emit(id + 'data', false, err)
-        })
-    }
-    portRead(port, id, readReduce)
-    // 分帧
-    if (data.data.length > 16) {
-        return new Promise((resolve, reject) => {
-            let resultData = ''
-            let checkData = ''
-            let firstCan = ''
-            let bufferCanDataArr = getWriteCans(data)
-            let mcan = function (reduceOk, canData) {
-                if (reduceOk) {
-                    let can = new MCan(canData)
-                    switch (can.canType) {
-                        case 'reply':
-                            port.removeRegister(id + 'data', mcan)
-                            port.removeRegister(id, readReduce)
-                            resolve(can.data)
-                            break;
-                        case 'first':
-                            firstCan = can
-                            break;
-                        case 'data':
-                            if (firstCan == '') {
-                                resolve(can)
-                            }
-                            if (can.canNow == firstCan.total) {
-                                resultData += can.data
-                                checkData+=resultData
-                                console.log(checkData)
-                                if (hexToNum(getBfCheckNumber(Buffer.from(checkData, 'hex'))) == firstCan.checkNum) {
-                                    port.removeRegister(id + 'data', mcan)
-                                    port.removeRegister(id, readReduce)
-                                    resolve(resultData)
-                                }else {
-                                    reject('数据不完整')
-                                }
-                            } else {
-                                resultData += can.data
-                            }
-                    }
-                } else {
-                    port.removeRegister(id + 'data', mcan)
-                    port.removeRegister(id, readReduce)
-                    reject(canData)
-                }
-            }
-            port.pEvent.on(id + 'data', mcan)
-            bufferCanDataArr.forEach(item => {
-                console.log(item.toString('hex'))
-                port.write(item)
-                    .catch(err => {
-                        port.removeRegister(id + 'data', mcan)
-                        port.removeRegister(id, readReduce)
-                        reject(err)
-                    })
-            })
-            setTimeout(() => {
-                port.removeRegister(id + 'data', mcan)
-                port.removeRegister(id, readReduce)
-                reject('超时了')
-            }, timer)
-        })
-    } else {
-        return new Promise((resolve, reject) => {
-            let resultData = ''
-            let checkData = ''
-            let firstCan = ''
-            let bufferCanData = new CanBuffer().init(data)
-            let mcan = function (reduceOk, canData) {
-                console.log(reduceOk,canData)
-                if (reduceOk) {
-                    let can = new MCan(canData)
-                    console.log(can)
-                    switch (can.canType) {
-                        case 'reply':
-                            port.removeRegister(id + 'data', mcan)
-                            port.removeRegister(id, readReduce)
-                            resolve(can.data)
-                            break;
-                        case 'first':
-                            firstCan = can
-                            checkData += firstCan.data
-                            break;
-                        case 'data':
-                            if (firstCan == '') {
-                                port.removeRegister(id + 'data', mcan)
-                                port.removeRegister(id, readReduce)
-                                resolve(can)
-                            }
-                            console.log(2,can.canNow,firstCan.total)
-                            if (can.canNow == firstCan.total) {
-                                resultData += can.data
-                                checkData+=resultData
-                                console.log(checkData)
-                                if (hexToNum(getBfCheckNumber(Buffer.from(checkData, 'hex'))) == firstCan.checkNum) {
-                                    port.removeRegister(id + 'data', mcan)
-                                    port.removeRegister(id, readReduce)
-                                    resolve(resultData)
-                                }
-                            } else {
-                                resultData += can.data
-                            }
-                    }
-                } else {
-                    port.removeRegister(id + 'data', mcan)
-                    port.removeRegister(id, readReduce)
-                    reject(canData)
-                }
-            }
-            port.pEvent.on(id + 'data', mcan)
-            console.log(bufferCanData.toString('hex'))
-            port.write(bufferCanData)
-                .catch(err => {
-                    port.removeRegister(id + 'data', mcan)
-                    port.removeRegister(id, readReduce)
-                    reject(err)
-                })
-            setTimeout(() => {
-                port.removeRegister(id + 'data', mcan)
-                port.removeRegister(id, readReduce)
-                reject('超时了')
-            }, timer)
-        })
-    }
-}
-
-/*
-* 串口发数据没有回复 如分帧，只有最后一帧有回复
-* 参数
-*   port 串口实例化对象    对象
-*   data 数据对象  类似帧 没有回复 只写data
-* */
-function portWriteNoReply(port, data) {
-    let id = data.id
-    data = getBfCan(data)
-    // 分帧
-    if (data.data.length > 16) {
-        return new Promise((resolve, reject) => {
-            let bufferCanDataArr = getWriteCans(data)
-            bufferCanDataArr.forEach(item => {
-                console.log(item.toString('hex'))
-                port.write(item)
-                    .catch(err => {
-                        reject(err)
-                    })
-            })
-        })
-    } else {
-        return new Promise((resolve, reject) => {
-            let bufferCanData = new CanBuffer().init(data)
-            console.log(bufferCanData.toString('hex'))
-            port.write(bufferCanData)
-                .catch(err => {
-                    reject(err)
-                })
-        })
-    }
-}
-
-/*
-* 注册读的数据 ID要是replay对应的hex
-* */
-function portRead(port, id, fn) {
-    port.register(id)
-    port.pEvent.on(id, fn)
-}
-
-/*
-* 只收数据的串口 如扫码枪
-* 参数
-*   port 串口实例化对象    对象
-*   id 事件对应的ID
-*   canParseClass 对读的数据结果处理类    类名
-*   canParseFn canParseClass的处理主方法名 字符串
-* */
-function portReadByReduce(port, id, canParseClass, canParseFn, successcb, failcb) {
-    let canParse = new canParseClass()
-    let readReduce = function (data) {
-        canParse[canParseFn](data, endData => {
-            successcb(endData, readReduce)
-        }, err => {
-            failcb(err, readReduce)
-        })
-    }
-    portRead(port, id, readReduce)
-}
 
 // 样式重置
 function resetTest() {
@@ -613,11 +380,11 @@ function checkSelf(number, cb) {
     let rtcBuf = checkRes[2]
     let mpuBuf = checkRes[1]
 
-    App.testList1[0].status = canBuf == 1 ? 'ok' : 'fail'
-    App.testList1[1].status = clockBuf == 1 ? 'ok' : 'fail'
-    App.testList1[2].status = adcBuf == 1 ? 'ok' : 'fail'
-    App.testList1[3].status = flashBuf == 1 ? 'ok' : 'fail'
-    App.testList2[0].status = fatfsBuf == 1 ? 'ok' : 'fail'
-    App.testList2[1].status = rtcBuf == 1 ? 'ok' : 'fail'
-    App.testList2[2].status = mpuBuf == 1 ? 'ok' : 'fail'
+    App.testList1[0].status&&(App.testList1[0].status = canBuf == 1 ? 'ok' : 'fail')
+    App.testList1[1].status&&(App.testList1[1].status = clockBuf == 1 ? 'ok' : 'fail')
+    App.testList1[2].status&&(App.testList1[2].status = adcBuf == 1 ? 'ok' : 'fail')
+    App.testList1[3].status&&(App.testList1[3].status = flashBuf == 1 ? 'ok' : 'fail')
+    App.testList2[0].status&&(App.testList2[0].status = fatfsBuf == 1 ? 'ok' : 'fail')
+    App.testList2[1].test&&(App.testList2[1].status = rtcBuf == 1 ? 'ok' : 'fail')
+    App.testList2[2].test&&(App.testList2[2].status = mpuBuf == 1 ? 'ok' : 'fail')
 }
