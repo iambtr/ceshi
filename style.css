@@ -1,0 +1,336 @@
+﻿html {
+	font-size: 100%;
+	-ms-text-size-adjust: 100%;
+	-webkit-text-size-adjust: 100%;/*关闭字体大小自动调整功能*/
+	box-sizing: border-box;/*为元素指定的任何内边距和边框都将在已设定的宽度和高度内进行绘制。*/
+}
+*, *:before, *:after {
+	box-sizing: border-box;
+}
+body, button {
+	font-family: 'Microsoft YaHei', '微软雅黑', 'Arial', sans-serif;
+	font-size: 14px;
+	line-height: 1.5;/*相对值:14x1.5=21px*/
+}
+body, div, ul, ol, li, dl, dt, dd, h1, h2, h3, h4, h5, h6, hgroup, p, blockquote, figure, form, fieldset, input, legend, pre, abbr, button {
+	margin: 0;
+	padding: 0;
+}
+a {
+	color: #4db8e2;
+	text-decoration: none;
+	outline: none;
+}
+a:hover {
+	color: #3399cc;
+	text-decoration: none;/*清除超链接的默认下划线*/
+}
+.clearfix:before, .clearfix:after {
+	content: "";    /*该属性用于定义元素之前或之后放置的生成内容。*/
+	display: table; /*此元素会作为块级表格来显示（类似 <table>），表格前后带有换行符。*/
+}
+.clearfix:after {
+	clear: both;  /*清除浮动*/
+}
+.content {
+	width: 800px;
+	overflow: auto;
+	margin: 0 auto;
+}
+.header {
+	width: 100%;
+	height: 60px;
+	padding: 13px 18px;
+	background: #4db8e2;
+}
+.logo {
+	width: 54px;
+	height: 34px;
+	float: left;
+	background: url(logo.png) no-repeat;
+}
+.logo-title {
+	width: auto;
+	height: 34px;
+	line-height: 34px;
+	float: left;
+	color: #ffffff;
+	font-size: 20px;
+	margin-left: 18px;
+}
+.set {
+	width: 100%;
+	height: 50px;
+	line-height: 50px;
+	background: #fafafa;
+	border-top: 1px solid #e6e5e6;
+	border-bottom: 1px solid #e6e5e6;
+	color: #4c4c4c;
+}
+.set-title {
+	float: left;
+	width: 102px;
+	height: 50px;
+	font-size: 16px;
+	text-align: center;
+}
+.set-form {
+	float: left;
+	height: 50px;
+	overflow: hidden;
+}
+.control-label {
+	float: left;
+	text-align: right;
+	margin-left: 15px;
+}
+.form-control {
+	float: left;
+	display: block;
+	height: 34px;
+	padding: 6px 12px;
+	font-size: 14px;
+	line-height: 1.42857143;
+	color: #555;
+	background-color: #fff;
+	border: 1px solid #e6e5e6;
+	border-radius: 4px;
+	margin: 7px 12px;
+}
+.form-control:focus {
+	border-color: #4db8e2;
+	outline: 0;
+	-webkit-box-shadow: inset 0 1px 1px rgba(0,0,0,.075), 0 0 8px rgba(102,175,233,.6);
+	box-shadow: inset 0 1px 1px rgba(0,0,0,.075), 0 0 8px rgba(102,175,233,.6);
+}
+.form-button {
+	float: right;
+	margin-right: 18px;
+	margin-top: 7px;
+	overflow: hidden;
+}
+.btn {
+	float: left;
+	padding: 0 20px;
+	margin-bottom: 0;
+	margin-left: 10px;
+	height: 34px;
+	line-height: 34px;
+	font-size: 14px;
+	text-align: center;
+	white-space: nowrap;
+	cursor: pointer;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	color: #fff;
+	outline: 0;
+}
+.btn-blue {
+	color: #fff;
+	background-color: #4db8e2;
+	border-color: #4db8e2;
+}
+.btn-blue:hover {
+	color: #fff;
+	background-color: #3399cc;
+	border-color: #3399cc;
+}
+.btn-gary {
+	color: #fff;
+	background-color: #ccc;
+	border-color: #ccc;
+}
+.btn-gary:hover {
+	color: #fff;
+	background-color: #ababab;
+	border-color: #ababab;
+}
+.tool {
+	width: 100%;
+	height: 48px;
+	line-height: 48px;
+	background: #fff;
+}
+.tool-button {
+	float: left;
+	margin-left: 10px;
+	margin-top: 7px;
+	overflow: hidden;
+}
+.table-content {
+	padding: 0 18px
+}
+.table {
+	width: 100%;
+	border-collapse: collapse;
+	border: 1px solid #e6e5e6
+}
+.table td {
+	text-align: center;
+	border-bottom: 1px solid #e6e5e6;
+	line-height: 28px;
+	font-size: 12px;
+}
+.table .title td {
+	font-size: 14px;
+	line-height: 36px;
+}
+input[type=radio], input[type=checkbox] {
+	margin: 4px 0 0;
+	margin-top: 1px \9;
+	line-height: normal;
+	border: 1px solid #e6e5e6;
+	background: #fff;
+}
+.tab-content {
+	padding: 18px 18px;
+}
+.tab {
+	width: 100%;
+}
+.tab ul {
+	list-style: none
+}
+.menubox {
+	width: 100%;
+	height: 40px;
+	border-left: 1px solid #e6e5e6;
+}
+.menubox li {
+	height: 40px;
+	line-height: 40px;
+	padding: 0 30px;
+	float: left;
+	border-top: 1px solid #e6e5e6;
+	border-right: 1px solid #e6e5e6;
+	background: #fafafa;
+	cursor: pointer;
+}
+.menubox li.hover {
+	background: #fff;
+	height: 41px;
+	margin-bottom: -1px;
+}
+.contentbox {
+	width: 100%;
+	padding: 12px;
+	border: 1px solid #e6e5e6;
+	overflow: hidden;
+}
+.file-box {
+	position: relative;
+	width: 100%;
+	line-height: 48px;
+}
+.file-box2 {
+	position: relative;
+	width: 50%;
+	line-height: 48px;
+	float: left;
+}
+.file {
+	position: absolute;
+	top: 0;
+	left: 0px;
+	height: 34px;
+ filter:alpha(opacity:0);
+	opacity: 0;
+	width: 100%;
+	margin: 7px 12px;
+}
+.file-box .file-text {
+	width: 530px;
+}
+.file-box2 .file-text {
+	width: 160px;
+}
+.file-btn {
+	margin-top: 7px;
+}
+.file-tip {
+	padding: 15px;
+}
+.file-tip h3 {
+	line-height: 30px;
+}
+.file-tip ol {
+	margin-left: 25px;
+	line-height: 24px;
+	color: #999999;
+}
+.all-down {
+	height: 40px;
+	line-height: 40px;
+	text-align: right
+}
+.all-down a {
+	padding: 0 20px;
+}
+.start-content {
+	margin: 10px 0;
+}
+.start-button {
+	width: 170px;
+	margin: 0 auto;
+}
+.start-btn {
+	height: 50px;
+	padding: 0 40px;
+}
+.testing-tip {
+	padding: 15px;
+	font-size: 20px;
+}
+.testing-tip-50 {
+	float: left;
+	width: 47%
+}
+.testing-tip-50:last-child {
+	margin-left: 6%;
+}
+.testing-tip h3 {
+	line-height: 40px;
+}
+.testing-tip ol {
+	margin-left: 25px;
+	line-height: 45px;
+}
+.greey-color {
+	background: #00B909;
+	color: #fff;
+}
+.red-color {
+	background: #C80003;
+	color: #fff
+}
+.testing-tip-50 ol li {
+	border-bottom: 1px dotted #ccc;
+	margin-bottom: 10px;
+}
+.testing-tip-50 .span1 {
+	float: right;
+	width: 80px;
+	text-align: center
+}
+.testing-tip-50 .span2 {
+	float: right;
+	width: 140px;
+	text-align: center
+}
+.testing-tip-50 ol li ol li {
+	border-bottom: 0px;
+}
+.alert-success{
+	color: green;
+	font-weight: bold;
+}
+.alert-warn{
+	color: red;
+	font-weight: bold;
+}
+.span1:hover{
+	background-color: #4db8e2;
+}
+.log{
+	width: 100%;height: 200px;font-size:20px;padding: 20px;text-align: center; border:3px solid #3399cc;
+}

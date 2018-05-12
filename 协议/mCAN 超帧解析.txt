@@ -1,0 +1,185 @@
+LV_STATE mult_CAN_send_force(uint32_t id, uint8_t msgType, uint32_t can_msgID, char *data, uint16_t len, uint8_t force)
+{
+    uint8_t  buff_m[8]         = {0};
+    uint16_t chksum            =  0;
+    uint8_t  pack_nbr          =  len / 7;
+    uint16_t residue_length    =  len;
+
+    CAN_msg      TxMsg = {0};
+    TxMsg.id      = id;
+    TxMsg.format  = EXTENDED_FORMAT;
+    TxMsg.type    = DATA_FRAME;
+
+    LV_STATE     can_err = LV_OK;
+
+    if(0 != len % 7)
+    { pack_nbr += 1; }
+
+    if(pack_nbr > 1 || 1 == force)
+    {
+        //第一个包
+        //packId
+        buff_m[0] = 0;
+        //数量
+        buff_m[1] = pack_nbr;
+        //msgType
+        memcpy(&buff_m[2], &msgType, 1);
+        //msgId
+        memcpy(&buff_m[3], (void*)&can_msgID, 3);
+        //校验
+        //数据
+        chksum  = calc_checksum((const uint8_t*)data, (const uint8_t*)(data + len - 1));
+        //msgType + msgID
+        chksum += calc_checksum((const uint8_t*)&buff_m[2], (const uint8_t*)&buff_m[5]);
+        //长度
+        chksum += pack_nbr;
+
+        memcpy(&buff_m[6],       &chksum, 2);
+
+
+        memcpy(&TxMsg.data[0], &buff_m[0], 8);
+        TxMsg.len = 8;
+        //can_err = txif_can(&TxMsg);
+        can_err = Post_can_msg(TxMsg);
+
+        //can_send_Msg_EXT(id, (void*)buff_m, 8);
+
+        //后面的包
+        for(uint8_t i = 1; residue_length > 0; i++)
+        {
+            buff_m[0] = i;
+
+            if(residue_length >= 7)
+            {
+                memcpy(&buff_m[1], data + ((i - 1) * 7),  7);
+
+                memcpy(&TxMsg.data[0], &buff_m[0], 8);
+                TxMsg.len = 8;
+                
+                //can_err = txif_can(&TxMsg);
+                can_err = Post_can_msg(TxMsg);
+
+                residue_length -= 7;
+            }
+            else
+            {
+                memcpy(&buff_m[1], data + ((i - 1) * 7),  residue_length);
+
+                memcpy(&TxMsg.data[0], &buff_m[0], residue_length + 1);
+                TxMsg.len = residue_length + 1;
+                
+                //can_err = txif_can(&TxMsg);
+                can_err = Post_can_msg(TxMsg);
+
+                residue_length = 0;
+            }
+        }
+    }
+    else
+    {
+        memcpy(&TxMsg.data[0], data, len);
+        TxMsg.len = len;
+        
+        //can_err = txif_can(&TxMsg);
+        can_err = Post_can_msg(TxMsg);
+        
+    }
+
+    return can_err;
+}
+
+
+
+int8_t mult_CAN_receive_with_ID(CAN_msg *pmsg, CAN_data_pack5_t *CAN_data_pack_m, uint16_t maxlen)
+{
+    uint8_t packId       = pmsg->data[0];
+    CAN_data_pack_m->packId_valid[packId] = 1;
+    CAN_data_pack_m->packId_len[packId]   = pmsg->len;
+
+    if(0 == packId)                            //第一个包
+    {
+        memset((void *)CAN_data_pack_m, 0, sizeof(CAN_data_pack5_t));      //mCAN消息超帧体，先清空整个Buff
+        
+        CAN_data_pack_m->pack_nbr = pmsg->data[1];                         //总帧数      [1]
+        CAN_data_pack_m->msgType  = pmsg->data[2];                         //消息类型    [2]
+        memcpy(&CAN_data_pack_m->can_msgId,    &pmsg->data[3], 3);         //消息ID      [3-5]
+        CAN_data_pack_m->user_buff_len = 0;                                //用户消息长度为0
+
+        if(0 == CAN_data_pack_m->pack_nbr)//只有一帧时 
+        {
+            //memset((void *)CAN_data_pack_m, 0, sizeof(CAN_data_pack5_t));  //mCAN消息超帧体清空
+            CAN_data_pack_m->result = pmsg->data[6];                       //成功或失败  [6]
+
+            if(1 == CAN_data_pack_m->result )
+                return 2;  //回复成功
+            else
+                return 3;  //回复失败
+        }
+        else
+        {
+            memcpy(&CAN_data_pack_m->chk,  &pmsg->data[6], 2);             //校验值      [6-7]
+        }
+    }
+    if(packId > 0)
+    {
+        //存入缓冲区
+        if((pmsg->len - 1) > 0)
+        { memcpy(&CAN_data_pack_m->user_buff[(packId - 1) * 7], &pmsg->data[1], (pmsg->len - 1)); }
+
+        //这样做能防止数组溢出
+        CAN_data_pack_m->user_buff_len += CAN_data_pack_m->packId_len[packId] - 1;
+        if(maxlen < (CAN_data_pack_m->user_buff_len))
+             return  (-1);
+
+        if(CAN_data_pack_m->pack_nbr == packId)   //最后一个包
+        {
+            for(int i = 1; i <= CAN_data_pack_m->pack_nbr; i++)
+            {
+                if(1 != CAN_data_pack_m->packId_valid[i])
+                {
+                    //CAN回复失败
+                    memset((void *)CAN_data_pack_m, 0, sizeof(CAN_data_pack5_t));
+                    return  -1;
+                }
+            }
+
+            //1.校验所有的数据
+            //加长度
+            CAN_data_pack_m->chk_temp  = CAN_data_pack_m->pack_nbr;
+            //加msgID
+            CAN_data_pack_m->chk_temp += CAN_data_pack_m->msgType;
+            //加ID
+            CAN_data_pack_m->chk_temp += calc_checksum(
+                                             (uint8_t*)&(CAN_data_pack_m->can_msgId),
+                                             (uint8_t*)&(CAN_data_pack_m->can_msgId) + 3);
+            //加数据
+            CAN_data_pack_m->chk_temp += calc_checksum(
+                                             (uint8_t*)&CAN_data_pack_m->user_buff,
+                                             (uint8_t*)&CAN_data_pack_m->user_buff[CAN_data_pack_m->user_buff_len-1]);
+
+            //2.成功则CAN回复成功，并将数据放到成功区，将数据通过GPRS发出
+            //  失败则CAN回复失败
+            if(CAN_data_pack_m->chk_temp == CAN_data_pack_m->chk)
+            {
+                //pack_CAN_play(pmsg->id, &CAN_data_pack_m->can_msgId, 1);
+                if(maxlen >= CAN_data_pack_m->user_buff_len)
+                {
+                    return 1;
+                }
+            }
+            else
+            {
+                // pack_CAN_play(pmsg->id, &CAN_data_pack_m->can_msgId, 0);
+            }
+
+            memset((void *)CAN_data_pack_m, 0, sizeof(CAN_data_pack5_t));
+            return  0;
+        }
+
+        return 0;
+    }
+    else
+    {
+        return -2;
+    }
+}

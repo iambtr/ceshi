@@ -1,403 +1,623 @@
-const path       = require('path');
-const dh = require('./dhport')
-const fs         = require('fs');
-const async      = require('async');
-const events     = require("events");
-
-const DhPort=dh.DhPort
-const Can=dh.Can
-const ReduceParse=dh.reduce_Parse
-const ScanGunParse=dh.ScanGunParse
-const getAllHex=dh.getAllHex
-const getDataHex=dh.getDataHex
-const getFixHex=dh.getFixHex
-const hexToNum=dh.hexToNum
-const numToFixHex=dh.numToFixHex
-const getBfCheckNumber=dh.getBfCheckNumber
+const dh = require('./dhport.js')
+const DhPort = dh.DhPort
+const CanBuffer = dh.CanBuffer
+const MCan = dh.MCan
+const ReduceParse = dh.reduce_Parse
+const ScanGunParse = dh.ScanGunParse
+const getAllHex = dh.getAllHex
+const getDataHex = dh.getDataHex
+const getFixHex = dh.getFixHex
+const hexToNum = dh.hexToNum
+const numToFixHex = dh.numToFixHex
+const getBfCheckNumber = dh.getBfCheckNumber
+const getReplyId = dh.getReplyId
+const strToHex = dh.strToHex
+const reverseHex = dh.reverseHex
+const events = require('events')
+const appEventManage = new events.EventEmitter()
+const getBfCan = dh.getBfCan
 //tbox串口
-var portTbox=''
-var reduceParse=''
-var serial   = document.getElementById('port');
-var baudrate = document.getElementById('baudrate');
-var button_connect    = document.getElementById('connect');
-var button_disconnect = document.getElementById('disconnect');
-var button_writeTbox    = document.getElementById('writeTbox');
+let portTbox = ''
 
 //扫码枪串口
-var portScan=''
-var portScanParse=''
-var serialScan = document.getElementById('portScan');
-var button_connectScan    = document.getElementById('connectScan');
-var button_disconnectScan = document.getElementById('disconnectScan');
+let portScan = ''
+//应用app
+const App = new Vue({
+    el: '#app',
+    data: {
+        portList: [],
+        v_tBoxCom: '',
+        v_tBoxLink: false,
+        v_scanCom: '',
+        v_scanLink: false,
+        v_scanTboxNum: '',
+        resultNotify: '测试中输出提示相关',
+        warn: false,
+        testList1: [{
+            name: '测试CAN',
+            test: true,
+            status: 'ready'//ok fail
+        }, {
+            name: '测试CLOCK',
+            test: true,
+            status: 'ready'//ok fail
+        }, {
+            name: '测试ADC',
+            test: true,
+            status: 'ready'//ok fail
+        }, {
+            name: '测试FLASH',
+            test: true,
+            status: 'ready'//ok fail
+        }],
+        testList2: [{
+            name: '测试FATFS',
+            test: true,
+            status: 'ready'//ok fail
+        }, {
+            name: '测试RTC',
+            test: true,
+            status: 'ready'//ok fail
+        }, {
+            name: '测试mpu6500',
+            test: true,
+            status: 'ready'//ok fail
+        }]
+    },
+    created() {
+        getPostList()
+    },
+    methods: {
+        createConnect,
+        closeConnect,
+        createScanConnect,
+        closeScanConnect,
+        startCheck,
+        writeTbox,
+        resetTest,
+        clickT,
+        changeTestItem(item) {
+            item.test = !item.test
+        },
+        alert(str) {
+            this.resultNotify = str
+            this.warn = false
+        },
+        error(str) {
+            this.resultNotify = str
+            this.warn = true
+        }
+    }
+})
+// 测试专用
+function clickT(){
+    let writeCan = {
+        id: '002003B9',
+        data: 0,
+        remoteType: 1
+    }
+    // ffcc0011eeb903200000000000000000000800010103b0
+    portWriteWithReply(portTbox, writeCan, ReduceParse, 'reduceProcess', 2000)
+        .then(data => {
+            console.log(Buffer.from(data,'hex').toString())
+        })
+        .catch(err => {
+            App.error('tBox自检出现错误输出：' + err)
+        })
+    setTimeout(()=>{
+        portTbox.pEvent.emit('data_proc',Buffer.from('ffaa0111eeb903200100020000000165030800010003fa','hex'))
+        portTbox.pEvent.emit('data_proc',Buffer.from('ffaa0111eeb90320010154314d48303148080001000553','hex'))
+        portTbox.pEvent.emit('data_proc',Buffer.from('ffaa0111eeb90320010259413831313239080001000530','hex'))
+    },80)
 
-// 串口初始化
-DhPort.list()
-    .then(function (ports) {
-        let str = "";
-        ports.forEach(function(port) {
-            var option = document.createElement("option");
-            option.text = port.comName + "  " + port.locationId;
-            option.value = port.comName;
+}
 
-            str += "\<option value=" + port.comName +  "\>" + port.comName + "\<\/option\>"
-            console.log(port)
+// 获取串口列表
+function getPostList() {
+    DhPort.list()
+        .then(ports => {
+            App.portList = ports
+        })
+        .catch(err => {
+            console.error(err);
         });
-        serial.innerHTML = str;
-        serialScan.innerHTML = str;
-    })
-    .catch(function (err) {
-        console.error(err);
-    });
-
-button_connect.onclick    = createConnect;
-button_disconnect.onclick = closeConnect;
-
-button_connectScan.onclick    = createScanConnect;
-button_disconnectScan.onclick = closeScanConnect;
-
-document.getElementById('update').onclick = startCheck;
-button_writeTbox.onclick = writeTbox;
-
-button_disconnect.disabled = true;
-button_disconnectScan.disabled = true;
+}
 
 //根据所选串口与扫描枪建立连接
-function createScanConnect(){
-    button_connectScan.disabled = true;
-    if(!portScan||portScan.comName!=serialScan.value){
+function createScanConnect() {
+    let COM = App.v_scanCom
+    if (!COM) {
+        alert('请先选择串口')
+        return
+    }
+    if (!portScan || portScan.comName != COM) {
         // 实例化一个串口类
         portScan = new DhPort({
-            comName: serialScan.value,
+            comName: COM,
             baudRate: 9600,
             autoOpen: false
         });
-        portScanParse=new ScanGunParse(14,2)
         // 设置tbox编码
-        portScan.readByCanAnalyse(portScanParse,portScanParse.reduceProcess,data=>{
-            document.getElementById('vcusn').value = data.toString()
-        },err=>{
-            document.getElementById('vcusn').value = err
+        portReadByReduce(portScan, 'scan', ScanGunParse, 'reduceProcess', data => {
+            App.v_scanTboxNum = data.toString()
+            App.alert('扫描成功输出：' + data.toString())
+        }, err => {
+            App.error('扫描失败输出：' + err)
         })
     }
 
-    portScan.open().then(msg=>{
-        console.log('扫码枪：'+msg)
-        button_connectScan.setAttribute("class", "btn-gary btn")
-        button_disconnectScan.setAttribute("class", "btn-blue btn")
-        button_disconnectScan.disabled = false;
-    }).catch(err=>{
-            console.log('扫码枪：'+err)
-        button_connectScan.disabled = false;
-        button_connectScan.setAttribute("class", "btn-blue btn")
-        button_disconnectScan.setAttribute("class", "btn-gary btn")
+    portScan.open().then(msg => {
+        App.v_scanLink = true
+        App.alert('扫码枪打开成功输出:' + msg)
+    }).catch(err => {
+        App.error('扫码枪打开失败输出：' + err)
     })
 }
+
 //带触发断开与扫描枪连接
 function closeScanConnect() {
-    button_disconnectScan.disabled = true;
     portScan.close()
         .then(function (msg) {
-            console.log('扫码枪：'+msg);
-            button_disconnectScan.setAttribute("class", "btn-gary btn")
-            button_connectScan.setAttribute("class", "btn-blue btn")
-            button_connectScan.disabled = false;
+            App.v_scanLink = false
+            App.resultNotify = '扫码枪关闭成功输出:' + msg
+            App.warn = false
         })
         .catch(function (err) {
-            console.log('扫码枪：'+err);
-            button_disconnectScan.disabled = false;
-            button_connectScan.disabled = true;
+            App.resultNotify = '扫码枪关闭失败输出：' + err
+            App.warn = true
         });
 }
 
 //根据所选串口与tbox板建立连接
-function createConnect(){
-    button_connect.disabled = true;
-    if(!portTbox||portTbox.comName!=serial.value){
+function createConnect() {
+    let COM = App.v_tBoxCom
+    if (!COM) {
+        alert('请先选择串口')
+        return
+    }
+    if (!portTbox || portTbox.comName != COM) {
         // 实例化一个串口类
         portTbox = new DhPort({
-            comName: serial.value,
+            comName: COM,
             baudRate: 115200,
             autoOpen: false
         });
-        reduceParse=new ReduceParse()
-        portTbox.readByCanAnalyse(reduceParse,reduceParse.reduceProcess,data=>{
-            let resCan=new Can().init(data.toString('hex'))
-            console.log('收到：'+data.toString('hex'))
-            if(resCan.id=='c9032001'){
-                // 自检返回
-                checkSelf(hexToNum(resCan.data.slice(0,2)))
-            }else if(resCan.id=='01022001'){
-                // 写入tbox编号返回
-                console.log(hexToNum(resCan.data))
-                if(hexToNum(resCan.data)==1){
-                    button_writeTbox.innerHTML = "写入成功";
-                    let setSn=document.getElementById('setSn')
-                    setSn.innerHTML = "写入成功";
-                    setSn.setAttribute("class", "greey-color span1");
-                }
-            }else if(resCan.id==13173536){
-
-            }
-
-        },err=>{
-            document.getElementById('vcusn').value = err
-        })
     }
     portTbox.open()
-        .then(msg=>{
-            console.log('tbox：'+msg)
-            button_connect.setAttribute("class", "btn-gary btn")
-            button_disconnect.setAttribute("class", "btn-blue btn")
-            button_disconnect.disabled = false;
+        .then(msg => {
+            App.v_tBoxLink = true
+            App.alert('tBox串口打开成功输出:' + msg)
         })
-        .catch(err=>{
-            console.error('tbox：'+err)
-            button_connect.disabled = false;
-            button_disconnect.setAttribute("class", "btn-gary btn")
-            button_connect.setAttribute("class", "btn-blue btn")
+        .catch(err => {
+            App.error('tBox串口打开失败输出：' + err)
         })
 }
+
 //带触发断开与vcu板连接
 function closeConnect() {
-    button_disconnect.disabled = true;
     portTbox.close()
         .then(function (msg) {
-            console.log('tbox：'+msg);
-            button_disconnect.setAttribute("class", "btn-gary btn")
-            button_connect.setAttribute("class", "btn-blue btn")
-            button_connect.disabled = false;
+            App.v_tBoxLink = false
+            App.alert('tBox串口关闭成功输出:' + msg)
         })
         .catch(function (err) {
-            console.log('tbox：'+err);
-            button_disconnect.disabled = false;
-            button_connect.disabled = true;
-            button_disconnect.setAttribute("class", "btn-blue btn")
-            button_connect.setAttribute("class", "btn-gary btn")
+            App.error('tBox串口关闭失败输出：' + err)
         });
 }
-// 样式重置
-function styleInit() {
-    var can     = document.getElementById('can');
-    var clock   = document.getElementById('clock');
-    var adc     = document.getElementById('adc');
-    var flash   = document.getElementById('flash');
-    var fatfs   = document.getElementById('fatfs');
-    var rtc     = document.getElementById('rtc');
-    var mpu6500 = document.getElementById('mpu');
-    var setSn   = document.getElementById('setSn');
 
-    can.innerHTML = "测试";
-    can.setAttribute("class", "span1");
-    clock.innerHTML = "测试";
-    clock.setAttribute("class", "span1");
-    adc.innerHTML = "测试";
-    adc.setAttribute("class", "span1");
-    flash.innerHTML = "测试";
-    flash.setAttribute("class", "span1");
-    fatfs.innerHTML = "测试";
-    fatfs.setAttribute("class", "span1");
-    rtc.innerHTML = "测试";
-    rtc.setAttribute("class", "span1");
-    mpu6500.innerHTML = "测试";
-    mpu6500.setAttribute("class", "span1");
-    setSn.innerHTML = "未设置";
-    setSn.setAttribute("class", "span1");
-    button_writeTbox.innerHTML = "写入tBox编号";
-}
 // 开始自检
 function startCheck() {
-    styleInit()
-    let writeCan=new Can().init({
-        head:'ffcc',
-        type:'ee',
-        id:'c9032000',
-        data:'00',
-        len:8,
-        ch:0,
-        format:1,
-        remoteType:1
-    })
-    portTbox.write(writeCan,2)
-        .then(function (msg) {
-            console.log(msg);
-        }).catch(function (err) {
-            console.error(err);
-    });
-}
-// 自检视图更新
-function checkSelf(number,cb) {
-    let checkRes=number.toString(2)
-        while(checkRes.length<8){
-            checkRes='0'+checkRes
-        }
-
-    var canBuf   = checkRes[7]
-    var clockBuf = checkRes[6]
-    var adcBuf   = checkRes[5]
-    var flashBuf = checkRes[4]
-    var fatfsBuf = checkRes[3]
-    var rtcBuf   = checkRes[2]
-    var mpuBuf   = checkRes[1]
-
-    var can   = document.getElementById('can');
-    var clock = document.getElementById('clock');
-    var adc   = document.getElementById('adc');
-    var flash = document.getElementById('flash');
-    var fatfs = document.getElementById('fatfs');
-    var rtc   = document.getElementById('rtc');
-    var mpu   = document.getElementById('mpu');
-
-    if (canBuf == 1)
-    {
-        can.innerHTML = "正常";
-        can.setAttribute("class", "greey-color span1");
+    if (!App.v_tBoxLink) {
+        alert('请先连接tBox')
+        return
     }
-    else
-    {
-        can.innerHTML = "异常";
-        can.setAttribute("class", "red-color span1");
+    let writeCan = {
+        id: '002003C9',
+        data: 0,
+        remoteType: 1
     }
-    if (clockBuf == 1)
-    {
-        clock.innerHTML = "正常";
-        clock.setAttribute("class", "greey-color span1");
-    }
-    else
-    {
-        clock.innerHTML = "异常";
-        clock.setAttribute("class", "red-color span1");
-    }
-    if (adcBuf == 1)
-    {
-        adc.innerHTML = "正常";
-        adc.setAttribute("class", "greey-color span1");
-    }
-    else
-    {
-        adc.innerHTML = "异常";
-        adc.setAttribute("class", "red-color span1");
-    }
-    if (flashBuf == 1)
-    {
-        flash.innerHTML = "正常";
-        flash.setAttribute("class", "greey-color span1");
-    }
-    else
-    {
-        flash.innerHTML = "异常";
-        flash.setAttribute("class", "red-color span1");
-    }
-    if (fatfsBuf == 1)
-    {
-        fatfs.innerHTML = "正常";
-        fatfs.setAttribute("class", "greey-color span1");
-    }
-    else
-    {
-        fatfs.innerHTML = "异常";
-        fatfs.setAttribute("class", "red-color span1");
-    }
-    rtc.innerHTML = "正常";
-    rtc.setAttribute("class", "greey-color span1");
-    // if (rtcBuf == 1)
-    // {
-    //     rtc.innerHTML = "正常";
-    //     rtc.setAttribute("class", "greey-color span1");
-    // }
-    // else
-    // {
-    //     rtc.innerHTML = "异常";
-    //     rtc.setAttribute("class", "red-color span1");
-    // }
-    mpu.innerHTML = "正常";
-    mpu.setAttribute("class", "greey-color span1");
-    // if (mpuBuf == 1)
-    // {
-    //     mpu.innerHTML = "正常";
-    //     mpu.setAttribute("class", "greey-color span1");
-    // }
-    // else
-    // {
-    //     mpu.innerHTML = "异常";
-    //     mpu.setAttribute("class", "red-color span1");
-    // }
-    cb&&cb()
+    portWriteWithReply(portTbox, writeCan, ReduceParse, 'reduceProcess', 2000)
+        .then(data => {
+            checkSelf(data.canNow)
+            App.alert('tBox自检成功')
+        })
+        .catch(err => {
+            App.error('tBox自检出现错误输出：' + err)
+        })
 }
 
 //写tbox
-function writeTbox(tboxStr) {
-    let tBoxNo=document.getElementById('vcusn').value
-    if(tBoxNo.length!=14){
-        button_writeTbox.innerHTML = "请先扫描二维码";
-        setTimeout(()=>{
-            button_writeTbox.innerHTML = "写入tBox编号";
-        },1500)
-    }else {
-        let writeCan=new Can().init({
-            head:'ffcc',
-            type:'ee',
-            id:'1e022000',
-            data:Buffer.from('NrWo2yqN').toString('hex'),
-            len:8,
-            ch:0,
-            format:1,
-            remoteType:0
-        })
-        console.log(writeCan.toString('hex'))
-        portTbox.write(writeCan)
-            .then(function (msg) {
-                console.log('密码'+msg);
-
-                button_writeTbox.innerHTML = "正在写入编号";
-                setTimeout(()=>{
-                    writeCans(tBoxNo,(bfc)=>{
-                    console.log('写入：'+bfc.toString('hex'))
-                        portTbox.write(bfc)
-                            .then(function (msg) {
-                                console.log('写入帧'+msg);
-                            }).catch(function (err) {
-                            console.error(err);
-                        });
-                    })
-                },500)
-            }).catch(function (err) {
-            console.error(err);
-        });
+function writeTbox() {
+    let tBoxNo = App.v_scanTboxNum
+    if (!App.v_tBoxLink) {
+        alert('请先连接tBox')
+        return
     }
+    if (!tBoxNo) {
+        alert('请先扫描tBox编号')
+        return
+    }
+    let writeCan = {
+        id: '0020021E',
+        data: 'NrWo2yqN',
+    }
+    //解密
+    portWriteNoReply(portTbox, writeCan).catch(err => {
+        App.error('解密失败:' + err)
+        return
+    })
+    // 写入tbox
+    let can = {
+        id: '00200201',
+        data:tBoxNo,
+        uniqueId:'000001'
+    }
+
+    portWriteWithReply(portTbox, can, ReduceParse, 'reduceProcess', 2000)
+        .then(data => {
+            if (data == '01') {
+                App.alert('tBox已经写入,下面重启校验')
+//重启
+                let can = {
+                    id: '00200201',
+                    data:0,
+                    remoteType:1
+                }
+
+                portWriteWithReply(portTbox, can, ReduceParse, 'reduceProcess', 2000)
+                    .then(data => {
+                        App.alert('tBox重启成功,下面校验')
+                        //读取
+                        let can = {
+                            id: '00200201',
+                            data:0,
+                            remoteType:1
+                        }
+
+                        portWriteWithReply(portTbox, can, ReduceParse, 'reduceProcess', 2000)
+                            .then(data => {
+                                //读取tbox编号比较
+                                let tboxReadNum=Buffer.from(data,'hex').toString()
+                                if(tboxReadNum==tBoxNo){
+                                    App.alert('tBox已经写入并校验成功')
+                                }else {
+                                    App.error('tBox写入校验失败:读取的tBox编号' + Buffer.from(data,'hex').toString())
+                                }
+
+                            })
+                            .catch(err => {
+                                App.error('tBox写入失败:读取tbox编号失败' + err)
+                            })
+                    })
+                    .catch(err => {
+                        App.error('tBox写入失败:重启失败' + err)
+                    })
+            } else {
+                App.error('tBox返回：tBox写入失败')
+            }
+        })
+        .catch(err => {
+            App.error('tBox写入失败:未写入' + err)
+        })
+
 }
+
 //传入14字节的tboxNumber 封装成多个帧对象返回回调
-function writeCans(str,callBack) {
-    let cansHeadHexStr='0200000001'
-    let conBf=Buffer.concat([Buffer.from(cansHeadHexStr,'hex'),Buffer.from(str)])
-    for(let i=0;i<str.length/7+1;i++){
-        if(i==0){
-            let writeCan=new Can().init({
-                head:'ffcc',
-                type:'ee',
-                id:'01022000',
-                data:numToFixHex(i)+cansHeadHexStr+getBfCheckNumber(conBf,true),
-                len:8,
-                ch:0,
-                format:1,
-                remoteType:0
-            })
-            callBack&&callBack(writeCan)
-        }else {
-            let writeCan=new Can().init({
-                head:'ffcc',
-                type:'ee',
-                id:'01022000',
-                data:numToFixHex(i)+Buffer.from(str.slice((i-1)*7,i*7)).toString('hex'),
-                len:8,
-                ch:0,
-                format:1,
-                remoteType:0
-            })
-            callBack&&callBack(writeCan)
+/*
+* data 对象包含head,type,data,id,len,ch,format,remoteType
+* */
+function getWriteCans(data) {
+    let canTotal = Math.ceil(data.data.length / 14)
+    let lastLen = data.data.length % 14 == 0 ? 8 : (data.data.length % 14 / 2 + 1)
+    let cansHeadHexStr = numToFixHex(canTotal) + '00' + data.uniqueId||'000001'
+    let conBf = Buffer.concat([Buffer.from(cansHeadHexStr, 'hex'), Buffer.from(data.data, 'hex')])
+    let arr = []
+    for (let i = 0; i < canTotal + 1; i++) {
+        if (i == 0) {
+            let writeCan = {
+                id: data.id,
+                data: numToFixHex(i) + cansHeadHexStr + getBfCheckNumber(conBf, true),
+                len: data.len || 8,
+                ch: data.ch || 0,
+                format: data.format || 1,
+                remoteType: data.remoteType || 0
+            }
+            let bfCanData = new CanBuffer().init(writeCan)
+            arr.push(bfCanData)
+        } else if (i == canTotal) {
+            let writeCan = {
+                id: data.id,
+                data: numToFixHex(i) + data.data.slice((i - 1) * 14, i * 14),
+                len: lastLen,
+                ch: data.ch || 0,
+                format: data.format || 1,
+                remoteType: data.remoteType || 0
+            }
+            let bfCanData = new CanBuffer().init(writeCan)
+            arr.push(bfCanData)
+        } else {
+            let writeCan = {
+                id: data.id,
+                data: numToFixHex(i) + data.data.slice((i - 1) * 14, i * 14),
+                len: data.len || 8,
+                ch: data.ch || 0,
+                format: data.format || 1,
+                remoteType: data.remoteType || 0
+            }
+            let bfCanData = new CanBuffer().init(writeCan)
+            arr.push(bfCanData)
         }
     }
+    return arr
 }
-function portWrite(){
+
+/*
+* 串口发数据有回复 如分帧最后一帧 自检
+* 参数
+*   port 串口实例化对象    对象
+*   data 数据对象  类似帧
+*   canParseClass 对读的数据结果处理类    类名
+*   canParseFn canParseClass的处理主方法名 字符串
+*   timer 期待回复的超时时间
+* */
+function portWriteWithReply(port, data, canParseClass, canParseFn, timer) {
+    let id = data.id
+    data = getBfCan(data)
+    let replyId = getReplyId(data.id)
+    let canParse = new canParseClass()
+    let readReduce = function (data) {
+        canParse[canParseFn](data, endData => {
+            let resCan = new CanBuffer().init(endData.toString('hex'))
+            console.log(resCan.id,replyId,resCan.id == replyId)
+            if (resCan.id == replyId) {
+                port.pEvent.emit(id + 'data', true, resCan.data)
+            }
+        }, err => {
+            port.pEvent.emit(id + 'data', false, err)
+        })
+    }
+    portRead(port, id, readReduce)
+    // 分帧
+    if (data.data.length > 16) {
+        return new Promise((resolve, reject) => {
+            let resultData = ''
+            let checkData = ''
+            let firstCan = ''
+            let bufferCanDataArr = getWriteCans(data)
+            let mcan = function (reduceOk, canData) {
+                if (reduceOk) {
+                    let can = new MCan(canData)
+                    switch (can.canType) {
+                        case 'reply':
+                            port.removeRegister(id + 'data', mcan)
+                            port.removeRegister(id, readReduce)
+                            resolve(can.data)
+                            break;
+                        case 'first':
+                            firstCan = can
+                            break;
+                        case 'data':
+                            if (firstCan == '') {
+                                resolve(can)
+                            }
+                            if (can.canNow == firstCan.total) {
+                                resultData += can.data
+                                checkData+=resultData
+                                console.log(checkData)
+                                if (hexToNum(getBfCheckNumber(Buffer.from(checkData, 'hex'))) == firstCan.checkNum) {
+                                    port.removeRegister(id + 'data', mcan)
+                                    port.removeRegister(id, readReduce)
+                                    resolve(resultData)
+                                }else {
+                                    reject('数据不完整')
+                                }
+                            } else {
+                                resultData += can.data
+                            }
+                    }
+                } else {
+                    port.removeRegister(id + 'data', mcan)
+                    port.removeRegister(id, readReduce)
+                    reject(canData)
+                }
+            }
+            port.pEvent.on(id + 'data', mcan)
+            bufferCanDataArr.forEach(item => {
+                console.log(item.toString('hex'))
+                port.write(item)
+                    .catch(err => {
+                        port.removeRegister(id + 'data', mcan)
+                        port.removeRegister(id, readReduce)
+                        reject(err)
+                    })
+            })
+            setTimeout(() => {
+                port.removeRegister(id + 'data', mcan)
+                port.removeRegister(id, readReduce)
+                reject('超时了')
+            }, timer)
+        })
+    } else {
+        return new Promise((resolve, reject) => {
+            let resultData = ''
+            let checkData = ''
+            let firstCan = ''
+            let bufferCanData = new CanBuffer().init(data)
+            let mcan = function (reduceOk, canData) {
+                console.log(reduceOk,canData)
+                if (reduceOk) {
+                    let can = new MCan(canData)
+                    console.log(can)
+                    switch (can.canType) {
+                        case 'reply':
+                            port.removeRegister(id + 'data', mcan)
+                            port.removeRegister(id, readReduce)
+                            resolve(can.data)
+                            break;
+                        case 'first':
+                            firstCan = can
+                            checkData += firstCan.data
+                            break;
+                        case 'data':
+                            if (firstCan == '') {
+                                port.removeRegister(id + 'data', mcan)
+                                port.removeRegister(id, readReduce)
+                                resolve(can)
+                            }
+                            console.log(2,can.canNow,firstCan.total)
+                            if (can.canNow == firstCan.total) {
+                                resultData += can.data
+                                checkData+=resultData
+                                console.log(checkData)
+                                if (hexToNum(getBfCheckNumber(Buffer.from(checkData, 'hex'))) == firstCan.checkNum) {
+                                    port.removeRegister(id + 'data', mcan)
+                                    port.removeRegister(id, readReduce)
+                                    resolve(resultData)
+                                }
+                            } else {
+                                resultData += can.data
+                            }
+                    }
+                } else {
+                    port.removeRegister(id + 'data', mcan)
+                    port.removeRegister(id, readReduce)
+                    reject(canData)
+                }
+            }
+            port.pEvent.on(id + 'data', mcan)
+            console.log(bufferCanData.toString('hex'))
+            port.write(bufferCanData)
+                .catch(err => {
+                    port.removeRegister(id + 'data', mcan)
+                    port.removeRegister(id, readReduce)
+                    reject(err)
+                })
+            setTimeout(() => {
+                port.removeRegister(id + 'data', mcan)
+                port.removeRegister(id, readReduce)
+                reject('超时了')
+            }, timer)
+        })
+    }
+}
+
+/*
+* 串口发数据没有回复 如分帧，只有最后一帧有回复
+* 参数
+*   port 串口实例化对象    对象
+*   data 数据对象  类似帧 没有回复 只写data
+* */
+function portWriteNoReply(port, data) {
+    let id = data.id
+    data = getBfCan(data)
+    // 分帧
+    if (data.data.length > 16) {
+        return new Promise((resolve, reject) => {
+            let bufferCanDataArr = getWriteCans(data)
+            bufferCanDataArr.forEach(item => {
+                console.log(item.toString('hex'))
+                port.write(item)
+                    .catch(err => {
+                        reject(err)
+                    })
+            })
+        })
+    } else {
+        return new Promise((resolve, reject) => {
+            let bufferCanData = new CanBuffer().init(data)
+            console.log(bufferCanData.toString('hex'))
+            port.write(bufferCanData)
+                .catch(err => {
+                    reject(err)
+                })
+        })
+    }
+}
+
+/*
+* 注册读的数据 ID要是replay对应的hex
+* */
+function portRead(port, id, fn) {
+    port.register(id)
+    port.pEvent.on(id, fn)
+}
+
+/*
+* 只收数据的串口 如扫码枪
+* 参数
+*   port 串口实例化对象    对象
+*   id 事件对应的ID
+*   canParseClass 对读的数据结果处理类    类名
+*   canParseFn canParseClass的处理主方法名 字符串
+* */
+function portReadByReduce(port, id, canParseClass, canParseFn, successcb, failcb) {
+    let canParse = new canParseClass()
+    let readReduce = function (data) {
+        canParse[canParseFn](data, endData => {
+            successcb(endData, readReduce)
+        }, err => {
+            failcb(err, readReduce)
+        })
+    }
+    portRead(port, id, readReduce)
+}
+
+// 样式重置
+function resetTest() {
+    App.testList1 = [{
+        name: '测试CAN',
+        test: true,
+        status: 'ready'//ok fail
+    }, {
+        name: '测试CLOCK',
+        test: true,
+        status: 'ready'//ok fail
+    }, {
+        name: '测试ADC',
+        test: true,
+        status: 'ready'//ok fail
+    }, {
+        name: '测试FLASH',
+        test: true,
+        status: 'ready'//ok fail
+    }]
+    App.testList2 = [{
+        name: '测试FATFS',
+        test: true,
+        status: 'ready'//ok fail
+    }, {
+        name: '测试RTC',
+        test: true,
+        status: 'ready'//ok fail
+    }, {
+        name: '测试mpu6500',
+        test: true,
+        status: 'ready'//ok fail
+    }]
+    App.resultNotify = '自检显示已重置'
 
 }
 
+// 自检视图更新
+function checkSelf(number, cb) {
+    let checkRes = number.toString(2)
+    while (checkRes.length < 8) {
+        checkRes = '0' + checkRes
+    }
+
+    let canBuf = checkRes[7]
+    let clockBuf = checkRes[6]
+    let adcBuf = checkRes[5]
+    let flashBuf = checkRes[4]
+    let fatfsBuf = checkRes[3]
+    let rtcBuf = checkRes[2]
+    let mpuBuf = checkRes[1]
+
+    App.testList1[0].status = canBuf == 1 ? 'ok' : 'fail'
+    App.testList1[1].status = clockBuf == 1 ? 'ok' : 'fail'
+    App.testList1[2].status = adcBuf == 1 ? 'ok' : 'fail'
+    App.testList1[3].status = flashBuf == 1 ? 'ok' : 'fail'
+    App.testList2[0].status = fatfsBuf == 1 ? 'ok' : 'fail'
+    App.testList2[1].status = rtcBuf == 1 ? 'ok' : 'fail'
+    App.testList2[2].status = mpuBuf == 1 ? 'ok' : 'fail'
+}

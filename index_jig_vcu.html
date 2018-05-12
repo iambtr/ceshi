@@ -1,0 +1,196 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="style.css" rel="stylesheet" type="text/css" />
+</head>
+
+<body>
+<div class="content" id="app">
+	<div class="header">
+		<div class="logo"></div>
+		<div class="logo-title">全车固件更新</div>
+	</div>
+	<div class="set">
+		<div class="set-title">VCU板设置</div>
+		<div class="set-form">
+			<label class="control-label">串口</label>
+			<select class="form-control" style="width: 220px" v-model="v_vcuCom">
+				<option v-for="item in portList">{{item.comName}}</option>
+			</select>
+		</div>
+		<div class="set-form">
+			<label class="control-label">波特率</label>
+			<select class="form-control" style="width:120px" id="baudrate">
+				<option>115200</option>
+			</select>
+		</div>
+		<div class="form-button">
+			<button class="btn" :class="{'btn-blue':!v_vcuLink,'btn-gary':v_vcuLink}" @click="createConnect" :disabled="v_vcuLink">连接</button>
+			<button class="btn" :class="{'btn-blue':v_vcuLink,'btn-gary':!v_vcuLink}" @click="closeConnect" :disabled="!v_vcuLink">断开</button>
+		</div>
+	</div>
+	<div class="set">
+		<div class="set-title">测试治具设置</div>
+		<div class="set-form">
+			<label class="control-label">串口</label>
+			<select class="form-control" style="width: 220px" id="portTest" v-model="v_testCom">
+				<option v-for="item in portList">{{item.comName}}</option>
+			</select>
+		</div>
+		<div class="set-form">
+			<label class="control-label">波特率</label>
+			<select class="form-control" style="width:120px" id="baudrateTest">
+				<option>115200</option>
+			</select>
+		</div>
+		<div class="form-button">
+			<button class="btn" :class="{'btn-blue':!v_testLink,'btn-gary':v_testLink}" @click="createTestConnect" :disabled="v_testLink">连接</button>
+			<button class="btn" :class="{'btn-blue':v_testLink,'btn-gary':!v_testLink}" @click="closeTestConnect" :disabled="!v_testLink">断开</button>
+		</div>
+	</div>
+	<div class="set">
+		<div class="set-title">扫码枪设置</div>
+		<div class="set-form">
+			<label class="control-label">串口</label>
+			<select class="form-control" style="width: 220px" id="portScan" v-model="v_scanCom">
+				<option v-for="item in portList">{{item.comName}}</option>
+			</select>
+		</div>
+		<div class="set-form">
+			<label class="control-label">波特率</label>
+			<select class="form-control" style="width:120px" id="baudratescan">
+				<option>9600</option>
+			</select>
+		</div>
+		<div class="form-button">
+			<button class="btn" :class="{'btn-blue':!v_scanLink,'btn-gary':v_scanLink}" @click="createScanConnect" :disabled="v_scanLink">连接</button>
+			<button class="btn" :class="{'btn-blue':v_scanLink,'btn-gary':!v_scanLink}" @click="closeScanConnect" :disabled="!v_scanLink">断开</button>
+		</div>
+	</div>
+	<div>
+        <span style="float: left;margin-left: -572px;margin-top: 15px;">本次VCU编号</span>
+        <input type="text" class='form-control' id="vcusn" :value="v_scanVcuNum">
+		<span style="float: left;margin-left: 100px;margin-top: 15px;">硬件版本号</span>
+		<input type="text" class='form-control' id="hwversion" :value="v_hardNum">
+    </div>
+	<div  class="table-content" style="display: none">
+		<div class="file-box2">
+			<label class="control-label">选择固件文件</label>
+			<form action="" method="post" enctype="multipart/form-data">
+				<input type='text' name='textfield' id='textfield' class='form-control file-text' />
+				<input type='button' class='btn btn-blue file-btn' value='浏览...' />
+				<!--<input type="file" name="fileField" class="file" id="fileField" size="28" onchange="document.getElementById('textfield').value=this.value;-->
+				<!--document.getElementById('firmwareName').innerHTML= this.files[0]?this.files[0].name:'';-->
+				<!--document.getElementById('firmwareSize').innerHTML= this.files[0]?(parseInt(this.files[0].size/1024) + 'k'):'';-->
+				<!--document.getElementById('firmwareVer').innerHTML= this.files[0]?'v1.0':'';" />-->
+			</form>
+		</div>
+		<div class="file-box2">
+			<label class="control-label">选择音乐文件</label>
+			<form action="" method="post" enctype="multipart/form-data">
+				<input type='text' name='textfield' id='textfield2' class='form-control file-text' />
+				<input type='button' class='btn btn-blue file-btn' value='浏览...' />
+				<!--<input type="file" name="fileField" class="file" id="fileField2" size="28" onchange="document.getElementById('textfield2').value=this.value;-->
+				<!--document.getElementById('musicName').innerHTML= this.files[0]?this.files[0].name:'';-->
+				<!--document.getElementById('musicSize').innerHTML= this.files[0]?(parseInt(this.files[0].size/1024) + 'k'):'';-->
+				<!--document.getElementById('musicVer').innerHTML= this.files[0]?'v1.0':'';" />-->
+			</form>
+		</div>
+		<table class="table">
+			<tr class="title">
+				<td>
+				<td>文件名称</td>
+				<td>文件大小</td>
+				<td>文件版本</td>
+			</tr>
+			<tr>
+				<td>固件文件</td>
+				<td id="firmwareName"></td>
+				<td id="firmwareSize"></td>
+				<td id="firmwareVer"></td>
+			</tr>
+			<tr>
+				<td>音乐文件</td>
+				<td id="musicName"></td>
+				<td id="musicSize"></td>
+				<td id="musicVer"></td>
+			</tr>
+		</table>
+	</div>
+	<div class="start-content" style="display: none">
+		<div class="start-button">
+			<button class="btn btn-blue start-btn" id="update">开始烧写固件</button>
+		</div>
+	</div>
+	<div class=" clearfix"></div>
+	<div class="testing-tip" id="press">
+		<h3>过程详情</h3>
+		<div class="testing-tip-50">
+			<ol>
+				<li>测试电压<span class="span1" id="voltage">测试</span></li>
+				<li>下载固件<span class="span1" id="progress_bin">0%</span></li>
+				<li>下载音乐<span class="span1" id="progress_rmf">0%</span></li>
+				<li>语音播放测试
+					<span class="span2" >
+						<label>
+							<input type="radio" name="RadioGroup0" value="正常" id="voiceNormal">
+							正常
+						</label>
+						<label>
+							<input type="radio" name="RadioGroup0" value="错误" id="voiceAbnormal">
+							错误
+						</label>
+					</span>
+				</li>
+				<li>测试CAN<span class="span1" id="can">测试</span></li>
+				<li>测试485<span class="span1" id="four85">测试</span></li>
+				<li>测试数据蓝牙<span class="span1" id="dataBluetooth">测试</span></li>
+				<li>测试音频蓝牙<span class="span1" id="musicBluetooth">测试</span></li>
+			</ol>
+		</div>
+		<div class="testing-tip-50">
+			<ol start="9">
+				<li>RTC状态<span class="span1" id="rtc">测试</span></li>
+				<li>设置RTC<span class="span1" id="setrtc">测试</span></li>
+				<li>输入输出测试<span class="span1" id="inout">测试</span></li>
+				<li>遥控器测试
+					<ol>
+						<li>锁定键
+							<span class="span2">
+								<label>
+									<input type="radio" name="RadioGroup1" value="正常" id="lockNormal">
+									正常
+								</label>
+								<label>
+									<input type="radio" name="RadioGroup1" value="错误" id="lockAbnormal">
+									错误
+								</label>
+							</span>
+						</li>
+						<li>解锁键
+							<span class="span2">
+								<label>
+									<input type="radio" name="RadioGroup2" value="正常" id="unlockNormal">
+									正常
+								</label>
+								<label>
+									<input type="radio" name="RadioGroup2" value="错误" id="unlockAbnormal">
+									错误
+								</label>
+							</span>
+						</li>
+					</ol>
+				</li>
+				<li>设置vcu编号<span class="span1" id="setSn">测试</span></li>
+				<li>设置硬件版本<span class="span1" id="setHwv">测试</span></li>
+			</ol>
+		</div>
+	</div>
+	<div class=" clearfix"></div>
+	<div class='log' :class="{'alert-success':!warn,'alert-warn':warn}">{{resultNotify}}</div>
+</div>
+<script src="./vue.min.js"></script>
+<script src="./vcu_main.js"></script>
+</body>
+</html>

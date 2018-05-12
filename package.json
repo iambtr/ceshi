@@ -1,0 +1,30 @@
+{
+  "name": "AppTest",
+  "version": "1.0.0",
+  "description": "A minimal Electron application",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "package": "electron-packager ../nodejs692 Test --win --out ../newApp2.1 --arch=x64 --electron-version 1.4.1 --overwrite --icon=./iap_js/test.ico --ignore=node_modules/electron-* --ignore=node_modules/gulp --ignore=node_modules/gulp-* --ignore=node_modules/.bin --ignore=.git"
+  },
+  "repository": "https://github.com/electron/electron-quick-start",
+  "keywords": [
+    "Electron",
+    "quick",
+    "start",
+    "tutorial",
+    "demo"
+  ],
+  "author": "GitHub",
+  "license": "CC0-1.0",
+  "dependencies": {
+    "async": "^1.5.0",
+    "i": "^0.3.6",
+    "javascript-state-machine": "^3.0.1",
+    "serialport": "^4.0.7"
+  },
+  "devDependencies": {
+    "electron": "^1.4.1",
+    "electron-packager": "^8.5.2"
+  }
+}
